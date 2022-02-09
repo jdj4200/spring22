@@ -218,8 +218,25 @@ Module Impl.
   Lemma seq_spec: forall f count i start, i < count -> ith i (seq f count start) = f (start + i).
   Proof.
     induct count; simplify.
-  Admitted.
 
+    linear_arithmetic.
+
+    unfold_recurse (seq f) count.
+    cases i; simplify.
+
+    Search (_ + 0).
+    rewrite N.add_0_r.
+    equality.
+
+    unfold_recurse ith i.
+
+    rewrite IHcount with (start := start + 1).
+    f_equal.
+    linear_arithmetic.
+    assert (forall j k, j + 1 < k + 1 -> j < k) by linear_arithmetic.
+    apply H0 in H.
+    apply H.
+    Qed.
   (* Exercise: Prove that if the index is out of bounds, "ith" returns 0. *)
   Lemma ith_out_of_bounds_0: forall i l, len l <= i -> ith i l = 0.
   Proof.
