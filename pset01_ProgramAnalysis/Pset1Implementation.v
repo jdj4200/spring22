@@ -19,16 +19,24 @@ Module Impl.
   (* Define [Neg] so that it implements Boolean negation, which flips
    * the truth value of a Boolean value.
    *)
-  Definition Neg (b : bool) : bool.
-  Admitted.
+  Definition Neg (b : bool) : bool :=
+    match b with
+    | true => false
+    | false => true
+    end.
 
+
+  Compute Neg true.
+  
+  
   (* For instance, the negation of [true] should be [false].
    * This proof should follow from reducing both sides of the equation
    * and observing that they are identical.
    *)
   Theorem Neg_true : Neg true = false.
   Proof.
-  Admitted.
+    equality.
+Qed.    
 
   (* Negation should be involutive, meaning that if we negate
    * any Boolean value twice, we should get the original value back.
@@ -39,39 +47,48 @@ Module Impl.
    *)
   Theorem Neg_involutive : forall b : bool, Neg (Neg b) = b.
   Proof.
-  Admitted.
+    induct b; equality.
+    Qed.
 
   (* Define [And] so that it implements Boolean conjunction. That is,
    * the result value should be [true] exactly when both inputs
    * are [true].
    *)
-  Definition And (x y : bool) : bool.
-  Admitted.
+    Definition And (x y : bool) : bool :=
+      match x, y with
+      | true, true => true
+      | _, _  => false
+      end.
 
   (* Here are a couple of examples of how [And] should act on
    * concrete inputs.
    *)
   Theorem And_true_true : And true true = true.
   Proof.
-  Admitted.
-
+    equality.
+    Qed.
+  
   Theorem And_false_true : And false true = false.
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   (* Prove that [And] is commutative, meaning that switching the order
    * of its arguments doesn't affect the result.
    *)
   Theorem And_comm : forall x y : bool, And x y = And y x.
   Proof.
-  Admitted.
+    induct x; try equality.
+    induct y; equality.
+    Qed.
 
   (* Prove that the conjunction of a Boolean value with [true]
    * doesn't change that value.
    *)
   Theorem And_true_r : forall x : bool, And x true = x.
   Proof.
-  Admitted.
+    induct x; try equality.
+    Qed.
 
   (* In the second part of this assignment, we will work with a simple language
    * of imperative arithmetic programs that sequentially apply operations
@@ -86,43 +103,72 @@ Module Impl.
    * that running the program [p] should result in, when the
    * initial state is [n].
    *)
-  Fixpoint run (p : Prog) (initState : nat) : nat.
-  Admitted.
+  Fixpoint run (p : Prog) (initState : nat) : nat :=
+    match p with
+    | Done => initState
+    | AddThen n next => run next (initState + n)
+    | MulThen n next => run next (initState * n)
+    | DivThen n next => run next (initState /  n)
+    | VidThen n next => run next (n / initState)
+    | SetToThen n next => run next  n
+    end.
 
   Theorem run_Example1 : run Done 0 = 0.
   Proof.
-  Admitted.
+    equality.
+  Qed.
 
   Theorem run_Example2 : run (MulThen 5 (AddThen 2 Done)) 1 = 7.
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   Theorem run_Example3 : run (SetToThen 3 (MulThen 2 Done)) 10 = 6.
   Proof.
-  Admitted.
+    equality.
+  Qed.
+
+  Theorem run_Example4 : run (DivThen 2 Done) 1 = 0.
+  Proof. equality. Qed.
 
   (* Define [numInstructions] to compute the number of instructions
    * in a program, not counting [Done] as an instruction.
    *)
-  Fixpoint numInstructions (p : Prog) : nat.
-  Admitted.
-
+  Fixpoint numInstructions (p : Prog) : nat :=
+   match p with
+    | Done => 0
+    | AddThen _ next  => 1 + numInstructions next
+    | MulThen _ next => 1 + numInstructions next
+    | DivThen _ next => 1 + numInstructions next
+    | VidThen _ next => 1 + numInstructions next
+    | SetToThen _ next => 1 + numInstructions next
+   end.
+   
   Theorem numInstructions_Example :
     numInstructions (MulThen 5 (AddThen 2 Done)) = 2.
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   (* Define [concatProg] such that [concatProg p1 p2] is the program
    * that first runs [p1] and then runs [p2].
    *)
-  Fixpoint concatProg (p1 p2 : Prog) : Prog.
-  Admitted.
+  Fixpoint concatProg (p1 p2 : Prog) : Prog :=
+    match p1 with
+    | Done => p2
+    | AddThen n next  => AddThen n (concatProg next p2)
+    | MulThen n next => MulThen n (concatProg next p2)
+    | DivThen n next => DivThen n (concatProg next p2)
+    | VidThen n next => VidThen n (concatProg next p2)
+    | SetToThen n next => SetToThen n (concatProg next p2)
+   end.
 
   Theorem concatProg_Example :
        concatProg (AddThen 1 Done) (MulThen 2 Done)
        = AddThen 1 (MulThen 2 Done).
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   (* Prove that the number of instructions in the concatenation of
    * two programs is the sum of the number of instructions in each
@@ -132,8 +178,9 @@ Module Impl.
     : forall (p1 p2 : Prog), numInstructions (concatProg p1 p2)
                         = numInstructions p1 + numInstructions p2.
   Proof.
-  Admitted.
-
+    induct p1; simplify; try equality.
+  Qed.
+  
   (* Prove that running the concatenation of [p1] with [p2] is
      equivalent to running [p1] and then running [p2] on the
      result. *)
@@ -142,7 +189,8 @@ Module Impl.
       run (concatProg p1 p2) initState =
       run p2 (run p1 initState).
   Proof.
-  Admitted.
+    induct p1; simplify; try equality.
+    Qed.
 
   (* Read this definition and understand how division by zero is handled. *)
   Fixpoint runPortable (p : Prog) (state : nat) : bool * nat :=
@@ -184,7 +232,40 @@ Module Impl.
   Lemma runPortable_run : forall p s0 s1,
     runPortable p s0 = (true, s1) -> run p s0 = s1.
   Proof.
-  Admitted.
+    induct p; simplify.
+
+    equality.
+
+    apply IHp.
+    Search (_ + _ = _ + _).
+    rewrite Nat.add_comm.
+    apply H.
+
+    apply IHp.
+    rewrite Nat.mul_comm.
+    apply H.
+
+    cases n.
+    simplify.
+    apply IHp.
+    equality.
+
+    simplify.
+    apply IHp.
+    apply H.
+
+    cases s0.
+    simplify.
+    apply IHp.
+    equality.
+
+    simplify.
+    apply IHp.
+    apply H.
+
+    apply IHp.
+    apply H.
+Qed.
 
   (* The final goal of this pset is to implement [validate : Prog -> bool]
      such that if this function returns [true], the program would not trigger
@@ -220,28 +301,49 @@ Module Impl.
 
   (* HINT 1 (see Pset1Signature.v) *)
 
-  Definition validate (p : Prog) : bool.
-  Admitted.
+  Fixpoint validateMinimum (p : Prog) (minimum : nat) : bool :=
+    match p with
+    | Done => true
+    | AddThen n next => validateMinimum next (minimum + n)
+    | MulThen n next => validateMinimum next (minimum * n)
+    | DivThen n next =>
+        if n ==n 0 then false else validateMinimum next (minimum / n)
+    | VidThen n next =>
+        if minimum ==n 0 then false else validateMinimum next 0
+    | SetToThen n next => validateMinimum next n
+    end.
+
+  Definition validate (p : Prog) : bool := validateMinimum p 0.
 
   (* Start by making sure that your solution passes the following tests, and add
    * at least one of your own tests: *)
 
-  Example validate1 : validate goodProgram1 = true. Admitted.
-  Example validate2 : validate goodProgram2 = true. Admitted.
-  Example validate3 : validate goodProgram3 = true. Admitted.
-  Example validate4 : validate goodProgram4 = true. Admitted.
-  Example validate5 : validate goodProgram5 = true. Admitted.
-  Example validate6 : validate goodProgram6 = true. Admitted.
-  Example validate7 : validate goodProgram7 = true. Admitted.
-  Example validateb1 : validate badProgram1 = false. Admitted.
-  Example validateb2 : validate badProgram2 = false. Admitted.
+  Example validate1 : validate goodProgram1 = true.
+  Proof. equality. Qed.
+  Example validate2 : validate goodProgram2 = true.
+  Proof. equality. Qed.
+  Example validate3 : validate goodProgram3 = true.
+  Proof. equality. Qed.
+  Example validate4 : validate goodProgram4 = true.
+  Proof. equality. Qed.
+  Example validate5 : validate goodProgram5 = true.
+  Proof. equality. Qed.
+  Example validate6 : validate goodProgram6 = true.
+  Proof. equality. Qed.
+  Example validate7 : validate goodProgram7 = true.
+  Proof. equality. Qed.
+  Example validateb1 : validate badProgram1 = false.
+  Proof. equality. Qed.
+  Example validateb2 : validate badProgram2 = false.
+  Proof. equality. Qed.
 
   (* Then, add your own example of a bad program here, and check that `validate`
    * returns `false` on it: *)
 
-  Definition badProgram3 : Prog. Admitted.
-  Example validateb3 : validate badProgram3 = false. Admitted.
-
+  Definition badProgram3 := AddThen 1 (DivThen 100 (VidThen 1 Done)).
+  Example validateb3 : validate badProgram3 = false.
+  Proof. equality. Qed.
+  
   (* HINTs 2-6 (see Pset1Signature.v)  *)
 
   (* Finally, before diving into the Coq proof, try to convince yourself that
@@ -252,14 +354,95 @@ Module Impl.
    * proceeding. *)
 
   (** Proof sketch: **)
-  (* [[Fill in your proof sketch here.]] *)
+  (*At a high level, validateMinimum p m validates p given that the input to p is >= m.
+    With this, the key lemma for this proof is to show that if validateMinimum p m = true,
+    then runPortable p s = (true, run p s) for all s >= m. This is the inductive hypothesis.
 
+    Inducting on p, the Done case is trivial. The AddThen and MulThen cases boil down to
+    the fact that forall n, s >= m -> s + n >= m + n and s * n >= m * n, respectively.
+
+    For the DivThen case, the inductive hypothesis validateMinimum p m = true implies that n    can't equal 0, otherwise validateMinimum p m would be false. So it suffices to show that
+    s >= m -> s / n >= m / n forall n > 0.
+
+    Similarly, the VidThen case requires that the current minimum can't be 0, so the
+    hypothesis is that for p = (VidThen n next), validateMinimum next 0 = true. Using this,     the fact that s  > 0 -> n / s >= 0 satisfies this case.
+
+    Finally, the SetThen case, p = SetThen n next is satisfied by plugging in n to the
+    inductive hypothesis.
+
+    With that key lemma, proving that validate is sound is as simple as noting that validate    is defined as validateMinimum p 0 and every natural number is >= 0.*)
+  
   (* Now you're ready to write the proof in Coq: *)
 
+  (* I used this lemma because I needed it for linear_arithmetic.*)
+  Lemma ge_Sn_0: forall s, forall m, s >= S m -> s > 0.
+  Proof. linear_arithmetic. Qed.
+
+  (* This lemma is used for an impossible case. *)
+  Lemma falsehood : 0 > 0 -> false = true.
+    Proof. linear_arithmetic. Qed.
+
+  Lemma validateMinimum_sound : forall p, forall m, validateMinimum p m = true ->
+                                  forall s, s >= m -> runPortable p s = (true, run p s).
+  Proof.
+    induct p; simplify.
+
+    equality.
+    
+    rewrite Nat.add_comm.
+    apply IHp with (m := (m+n)).
+    apply H.
+    linear_arithmetic.
+
+    rewrite Nat.mul_comm.
+    apply IHp with (m := (m * n)).
+    apply H.
+    Search (_ * _).
+    apply Nat.mul_le_mono_r.
+    apply H0.
+
+    cases n; simplify.
+
+    equality.
+    
+    apply IHp with (m := m / S n).
+    apply H.
+    Search (_ / _).
+    apply Nat.div_le_mono.
+    linear_arithmetic.
+    apply H0.
+
+    cases m; simplify.
+
+    equality.
+
+    apply ge_Sn_0 in H0.
+    cases s; simplify.
+    apply falsehood in H0.
+    equality.
+
+    apply IHp with (m := 0).
+    apply H.
+    linear_arithmetic.
+    
+    apply IHp with (m := n).
+    apply H.
+    linear_arithmetic.
+
+    Qed.
+    
+    
   Lemma validate_sound : forall p, validate p = true ->
     forall s, runPortable p s = (true, run p s).
-  Admitted.
+  Proof.
+    unfold validate.
+    simplify.
+    apply validateMinimum_sound with (m := 0).
+    apply H.
+    linear_arithmetic.
+  Qed.
 
+  
   (* Here is the complete list of commands used in one possible solution:
     - Search, for example Search (_ + 0).
     - induct, for example induct x
