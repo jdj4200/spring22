@@ -236,12 +236,25 @@ Module Impl.
     assert (forall j k, j + 1 < k + 1 -> j < k) by linear_arithmetic.
     apply H0 in H.
     apply H.
-    Qed.
+  Qed.
+  
   (* Exercise: Prove that if the index is out of bounds, "ith" returns 0. *)
   Lemma ith_out_of_bounds_0: forall i l, len l <= i -> ith i l = 0.
   Proof.
-  Admitted.
+    induct i; simplify.
+    cases l; simplify.
+    equality.
+    linear_arithmetic.
 
+    unfold_recurse ith i.
+    cases l; simplify.
+
+    equality.
+
+    apply IHi.
+    linear_arithmetic.
+    Qed.    
+    
 
   (* Binomial coefficients *)
   (* ********************* *)
