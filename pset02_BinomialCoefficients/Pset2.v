@@ -526,11 +526,170 @@ Module Impl.
      "a / b * c / d" is "((a / b) * c) / d", NOT "(a / b) * (c / d)"
 
   Here we go: *)
+
+  Lemma fact_one: forall n, n > 0 -> n! = n * (n-1)!.
+  Proof.
+    induct n; simplify.
+    linear_arithmetic.
+
+    unfold_recurse fact n.
+    replace (n + 1 - 1) with n by linear_arithmetic.
+    equality.
+  Qed.
+
+  Lemma fact_two: forall n, n > 0 -> (n-1)! = n! / n.
+  Proof.
+    induct n; simplify.
+    linear_arithmetic.
+
+    unfold_recurse fact n.
+    replace (n + 1 - 1) with n by linear_arithmetic.
+    rewrite N.mul_comm.
+    Search (_ * _ / _).
+    rewrite N.div_mul.
+    equality.
+    linear_arithmetic.
+  Qed.
+
+  Lemma fact_two_swap: forall n, n > 0 -> n! / n = (n-1)!.
+  Proof.
+    simplify.
+    rewrite fact_two.
+    equality.
+    assumption.
+    Qed.
+
+  Lemma fact_three: forall n, n > 0 -> ( n | n!).
+  Proof.
+    simplify.
+    rewrite fact_one.
+    Search (_ | _).
+    apply N.divide_factor_l.
+    assumption.
+    Qed.
+  
+  Lemma div_mul: forall a b c: N,  b <> 0 -> (b | a) -> c * (a / b) = c * a / b.
+  Proof.
+    simplify.
+    rewrite N.divide_div_mul_exact.
+    equality.
+    assumption.
+    assumption.
+  Qed.
+
+  Lemma div_div: forall a b c : N, b <> 0 -> c <> 0 -> a / (b * c) = a / b / c.
+  Proof.
+    simplify.
+    rewrite N.div_div.
+    equality.
+    assumption.
+    assumption.
+  Qed.
+
+  Lemma div_mul_cancel: forall a b c : N, b <> 0 -> c <> 0 -> a / b = (a * c) / (b * c).
+  Proof.
+    simplify.
+    rewrite N.div_mul_cancel_r.
+    equality.
+    assumption.
+    assumption.
+    Qed.
+
+   Lemma div_recip: forall a b c : N, b <> 0 -> c <> 0 ->
+                                     (c | b) -> (b | a) -> a / (b / c) = a / b * c.
+   Proof.
+     simplify.
+     Search (_ /  _).
+     rewrite div_mul_cancel with (c:= c).
+     rewrite N.mul_comm with (n := ( b / c)).
+     rewrite div_mul.
+     Search ( _ / _).
+     rewrite N.mul_comm with (m := b).
+     rewrite N.div_mul.
+     rewrite N.mul_comm with (m := c).
+     rewrite N.divide_div_mul_exact.
+     linear_arithmetic.
+
+     assumption.
+     assumption.
+     assumption.
+     assumption.
+     assumption.
+
+     apply  N.divide_pos_le in H1.
+     Search (_/_).
+     assert (0 < c <=b ) by linear_arithmetic.
+     apply N.div_str_pos in H3.
+     linear_arithmetic.
+     assert (b<> 0 -> 0 < b) by linear_arithmetic.
+     apply H3.
+     apply H.
+
+     assumption.
+   Qed.
+
+   Lemma mul_assoc: forall n m p : N, n * m * p = n * (m * p).
+   Proof.
+     simplify.
+     rewrite N.mul_assoc.
+     equality.
+     Qed.
+     
   Lemma bcoeff_correct: forall n k, k <= n -> bcoeff n k = C n k.
   Proof.
     induct k; simplify.
-  Admitted.
+    rewrite Cn0.
+    equality.
 
+    unfold_recurse (bcoeff n) k.
+    unfold C.
+
+    rewrite fact_one with (n := (k+1)).
+    replace (k + 1 - 1) with k by linear_arithmetic.
+    replace (n-(k+1)) with (n - k - 1) by linear_arithmetic.
+    rewrite fact_two with (n := n-k).
+    Search (_ * _ = _ * _).
+    rewrite N.mul_comm with (n := (k+1)).
+    rewrite N.mul_assoc.
+    rewrite div_div with (b := ((n - k)! / (n - k) * k!)).
+    rewrite N.mul_comm with (m := k!).
+    rewrite div_mul.
+    rewrite N.mul_comm with (m := (n-k)!).
+    rewrite div_recip.
+    replace (n! / ((n - k)! * k!)) with (C n k) by equality.
+    rewrite IHk.
+    equality.
+
+    linear_arithmetic.
+    apply N.neq_mul_0.
+    split.
+    apply fact_nonzero.
+    apply fact_nonzero.
+    linear_arithmetic.
+
+    rewrite fact_one.
+    Search (_ * _ * _).
+    rewrite mul_assoc.
+    Search (_ | _).
+    apply N.divide_factor_l.
+
+    linear_arithmetic.
+    apply C_is_integer.
+    linear_arithmetic.
+    linear_arithmetic.
+    apply fact_three.
+    linear_arithmetic.
+
+    apply N.neq_mul_0.
+    split.
+    rewrite fact_two_swap.
+    apply fact_nonzero.
+    linear_arithmetic.
+    apply fact_nonzero.
+    linear_arithmetic.
+    linear_arithmetic.
+    linear_arithmetic.
+    Qed.
 
   (* All binomial coefficients for a given n *)
   (* *************************************** *)
