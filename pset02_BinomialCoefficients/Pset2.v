@@ -780,13 +780,77 @@ Module Impl.
   (* Exercise: Let's prove that all_coeffs_fast is correct.
      Note that you can assume Pascal's rule to prove this. *)
   (* HINT 1 (see Pset2Sig.v) *)
+
+  Lemma ith_one_off: forall l k, ith (k + 1) (1 :: l) = ith k l.
+  Proof.
+    induct l; simplify.
+
+    unfold_recurse ith k.
+    equality.
+
+    unfold_recurse ith k.
+    equality.
+    Qed.
+    
   Lemma all_coeffs_fast_correct:
     Pascal's_rule ->
     forall n k,
       k <= n ->
       ith k (all_coeffs_fast n) = C n k.
   Proof.
-  Admitted.
+    
+    induct n; simplify.
+    replace k with 0 by linear_arithmetic.
+    equality.
+
+    unfold_recurse all_coeffs_fast n.
+    unfold nextLine.
+    remember (fun k0 : N => ith (k0 - 1) (all_coeffs_fast n) + ith k0 (all_coeffs_fast n)).
+    cases k.
+    simplify.
+    rewrite Cn0.
+    equality.
+
+    rewrite H.
+    replace (k + 1 - 1) with k by linear_arithmetic.
+
+    rewrite ith_one_off with (l := (seq n0 (len (all_coeffs_fast n)) 1)).
+    rewrite seq_spec.
+    rewrite Heqn0.
+    replace (1 + k - 1) with k by linear_arithmetic.
+    rewrite IHn.
+    cases k.
+
+    rewrite IHn.
+    equality.
+    cases n.
+
+    apply H0.
+    
+    cases k.
+    equality.
+    rewrite N.add_comm.
+    replace 
+    linear_arithmetic.
+    rewrite N.add_comm with (n := 1).
+    equality.
+
+    
+    
+    unfold_recurse ith k.
+    split.
+
+    rewrite H.
+    replace (k + 1 - 1) with k by linear_arithmetic.
+    
+
+    unfold_recurse ith k.
+    cases (nextLine (all_coeffs_fast n)).
+    rewrite IHk.
+    rewrite H.
+    
+    
+    
 
   (* ----- THIS IS THE END OF PSET2 ----- All exercises below this line are optional. *)
 
