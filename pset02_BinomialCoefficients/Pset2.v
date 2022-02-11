@@ -790,15 +790,34 @@ Module Impl.
 
     unfold_recurse ith k.
     equality.
+  Qed.
+
+  Lemma len_one_off: forall l, len (1 :: l) = 1 + len l.
+  Proof.
+    induct l; simplify.
+    equality.
+    equality.
     Qed.
-    
+
+  Lemma len_all_coeffs: forall n, len (all_coeffs_fast n) = n + 1.
+  Proof.
+    induct n; simplify.
+    equality.
+
+    unfold_recurse all_coeffs_fast n.
+    unfold nextLine.
+    rewrite len_one_off.
+    rewrite seq_len.
+    rewrite IHn.
+    linear_arithmetic.
+  Qed.
+  
   Lemma all_coeffs_fast_correct:
     Pascal's_rule ->
     forall n k,
       k <= n ->
       ith k (all_coeffs_fast n) = C n k.
   Proof.
-    
     induct n; simplify.
     replace k with 0 by linear_arithmetic.
     equality.
@@ -811,62 +830,36 @@ Module Impl.
     rewrite Cn0.
     equality.
 
-    rewrite H.
-    replace (k + 1 - 1) with k by linear_arithmetic.
-
     rewrite ith_one_off with (l := (seq n0 (len (all_coeffs_fast n)) 1)).
     rewrite seq_spec.
     rewrite Heqn0.
     replace (1 + k - 1) with k by linear_arithmetic.
     rewrite IHn.
-    rewrite N.add_comm with (n := 1).
-    cases n; simplify.
-    unfold C.
-    unfold_recurse ith k.
-    simplify.
-    replace k with 0 by linear_arithmetic.
-    simplify.
 
-    replace (0 + 1) with 1 by linear_arithmetic.
-    replace (1 * 1) with 1 by linear_arithmetic.
-    rewrite N.div_same with (a := 1).
-    replace (1 * 1) with 1 by linear_arithmetic.
-    rewrite N.div_same with (a := 1).
-    
-    
-    cases k.
-
-    rewrite IHn.
-    equality.
-    cases n.
-
-    apply H0.
-    
-    cases k.
-    equality.
-    rewrite N.add_comm.
-    replace 
+    assert (k = n \/ k + 1 <= n) as Hk by linear_arithmetic.
+    cases Hk; subst; simplify.
+    rewrite ith_out_of_bounds_0.
+    rewrite !Cnn.
     linear_arithmetic.
+
+    Focus 2.
+    rewrite IHn.
     rewrite N.add_comm with (n := 1).
-    equality.
-
-    
-    
-    unfold_recurse ith k.
-    split.
-
     rewrite H.
     replace (k + 1 - 1) with k by linear_arithmetic.
-    
+    equality.
 
-    unfold_recurse ith k.
-    cases (nextLine (all_coeffs_fast n)).
-    rewrite IHk.
-    rewrite H.
-    
-    
-    
+    linear_arithmetic.
+    rewrite N.add_comm.
+    assumption.
 
+    rewrite len_all_coeffs.
+    linear_arithmetic.
+    linear_arithmetic.
+    rewrite len_all_coeffs.
+    linear_arithmetic.
+    Qed.
+               
   (* ----- THIS IS THE END OF PSET2 ----- All exercises below this line are optional. *)
 
   (* Optional exercise: Let's prove that Pascal's rule holds.
