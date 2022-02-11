@@ -819,6 +819,21 @@ Module Impl.
     rewrite Heqn0.
     replace (1 + k - 1) with k by linear_arithmetic.
     rewrite IHn.
+    rewrite N.add_comm with (n := 1).
+    cases n; simplify.
+    unfold C.
+    unfold_recurse ith k.
+    simplify.
+    replace k with 0 by linear_arithmetic.
+    simplify.
+
+    replace (0 + 1) with 1 by linear_arithmetic.
+    replace (1 * 1) with 1 by linear_arithmetic.
+    rewrite N.div_same with (a := 1).
+    replace (1 * 1) with 1 by linear_arithmetic.
+    rewrite N.div_same with (a := 1).
+    
+    
     cases k.
 
     rewrite IHn.
