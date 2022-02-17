@@ -64,17 +64,32 @@ Module Impl.
   Lemma compose_id_l : forall A B (f: A -> B),
       id ∘ f = f.
   Proof.
-  Admitted.
+    simplify.
+    apply fun_ext.
+    simplify.
+    unfold compose.
+    equality.
+    Qed.
 
   Lemma compose_id_r : forall A B (f: A -> B),
       f ∘ id = f.
   Proof.
-  Admitted.
+    simplify.
+    apply fun_ext.
+    simplify.
+    unfold compose.
+    equality.
+    Qed.
 
   Lemma compose_assoc : forall A B C D (f: A -> B) (g: B -> C) (h: C -> D),
       h ∘ (g ∘ f) = h ∘ g ∘ f.
   Proof.
-  Admitted.
+    simplify.
+    apply fun_ext.
+    simplify.
+    unfold compose.
+    equality.
+    Qed.
 
   (* The selfCompose function takes a function and applies this function n times
      to the argument. There are different ways of defining it, but let's
@@ -94,14 +109,14 @@ Module Impl.
      saying "to raise [base] to the power [e], apply the function that multiplies
      its argument by [base] to [1] [e] times".
      Define [exp] using [selfCompose] and [Nat.mul]. *)
-  Definition exp(base e: nat): nat. Admitted.
+  Definition exp(base e: nat): nat := selfCompose (Nat.mul base) e 1.
 
   (* Once you define [exp], you can replace [Admitted.] below by [Proof. equality. Qed.] *)
-  Lemma test_exp_2_3: exp 2 3 = 8. Admitted.
-  Lemma test_exp_3_2: exp 3 2 = 9. Admitted.
-  Lemma test_exp_4_1: exp 4 1 = 4. Admitted.
-  Lemma test_exp_5_0: exp 5 0 = 1. Admitted.
-  Lemma test_exp_1_3: exp 1 3 = 1. Admitted.
+  Lemma test_exp_2_3: exp 2 3 = 8. Proof. equality. Qed.
+  Lemma test_exp_3_2: exp 3 2 = 9. Proof. equality. Qed.
+  Lemma test_exp_4_1: exp 4 1 = 4. Proof. equality. Qed.
+  Lemma test_exp_5_0: exp 5 0 = 1. Proof. equality. Qed.
+  Lemma test_exp_1_3: exp 1 3 = 1. Proof. equality. Qed.
 
   (* And here's another example to illustrate [selfCompose]. Make sure you understand
      why its result is 256. *)
@@ -117,7 +132,19 @@ Module Impl.
      is the left inverse of the function that adds two to its argument. *)
   Example plus2minus2: left_inverse (fun (x: nat) => x + 2) (fun (x: nat) => x - 2).
   Proof.
-  Admitted.
+    unfold left_inverse.
+    unfold compose.
+    apply fun_ext.
+    simplify.
+    replace (x + 2 - 2) with x by linear_arithmetic.
+    equality.
+  Qed.
+
+  Lemma fun_ext': forall {A B: Type}, forall (f g: A -> B), forall x,  f = g -> f x = g x.
+  Proof.
+    simplify.
+    f_equal.
+    Qed.
 
   (* On the other hand, note that the other direction does not hold, because
      if a subtraction on natural numbers underflows, it just returns 0, so
@@ -125,6 +152,19 @@ Module Impl.
      so it can't have a left inverse. *)
   Example minus2plus2: ~ left_inverse (fun (x: nat) => x - 2) (fun (x: nat) => x + 2).
   Proof.
+
+    unfold not.
+    unfold left_inverse.
+    unfold compose.
+    propositional.
+    unfold id in H.
+    rewrite fun_ext with (f := (fun x : nat => x - 2 + 2)) (g := (fun x : nat => x)) in H.
+    Focus 2.
+    rewrite fun_ext' with (g := (fun x : nat => x)) in H.
+    replace (fun x : nat => x - 0 + 0) with (fun x : nat => x)  in H by linear_arithmetic.
+    contradiction.
+    rewrite f_equal.
+    rewrite fun_ext.
   Admitted.
 
   (* Let us make the intuition from the previous paragraph more
