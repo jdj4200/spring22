@@ -370,12 +370,28 @@ Module Impl.
   simplify.
     equality.
   Qed.
+
+  Theorem lookup_insert_leaf {A} (k : list bool) (v : option A) :
+    lookup k (insert_leaf k v) = v.
+  Proof.
+    induct k; simplify.
+    equality.
+
+    cases a; simplify; apply IHk.
+  Qed.
   
   (* HINT 4 (see Pset3Sig.v) *) 
   Theorem lookup_insert {A} (k : list bool) (v : option A) (t : bitwise_trie A) :
     lookup k (insert k v t) = v.
   Proof.
-  Admitted.
+    induct k; simplify.
+    cases t; equality.
+
+    cases t; simplify.
+    cases a; simplify; apply lookup_insert_leaf.
+    
+    cases a; simplify; apply IHk.
+  Qed.
 
   (* Define an operation to "merge" that takes two bitwise tries and merges
    * them together. The [merge] definition should combine two bitwise tries, 
@@ -393,18 +409,27 @@ Module Impl.
    * the tries once.
    *)
   
-  Fixpoint merge {A} (t1 t2 : bitwise_trie A) : bitwise_trie A. Admitted.    
+  Fixpoint merge {A} (t1 t2 : bitwise_trie A) : bitwise_trie A :=
+    match t1 with
+    | Leaf => t2
+    | Node l1 d1 r1 =>
+        match t2 with
+        | Leaf => t1
+        | Node l2 d2 r2 => Node (merge l1 l2) (if d1 then d1 else d2) (merge r1 r2)
+        end
+    end.
+  
   Lemma merge_example1 :
     merge (Node Leaf (Some 1) Leaf) (Node Leaf (Some 2) Leaf) =
     Node Leaf (Some 1) Leaf.
-  Proof. Admitted.
+  Proof. equality. Qed.
   Lemma merge_example2 :
     merge Leaf (Node Leaf (@None nat) Leaf) = Node Leaf None Leaf.
-  Proof. Admitted.
+  Proof. equality. Qed.
   Lemma merge_example3 :
     merge (Node Leaf None Leaf) (Node Leaf (Some 2) Leaf) =
     Node Leaf (Some 2) Leaf.
-  Proof. Admitted.
+  Proof. equality. Qed.
     
   Theorem left_lookup_merge {A} : forall (t1 t2 : bitwise_trie A) k v,
       lookup k t1 = Some v ->
