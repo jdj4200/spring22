@@ -318,7 +318,9 @@ Module Impl.
   Theorem lookup_empty {A} (k : list bool)
     : lookup k (Leaf : bitwise_trie A) = None.
   Proof.
-  Admitted.
+    simplify.
+    equality.
+  Qed.
 
   (* HINT 3 (see Pset3Sig.v) *)
 
@@ -338,16 +340,36 @@ Module Impl.
    * that creates a singleton tree (a tree containing a single
    * key-value pair).
    *)
+  Fixpoint insert_leaf{A} (k: list bool) (v: option A)  : bitwise_trie A :=
+    match k with
+        | nil => Node Leaf v Leaf
+        | true :: rest => Node (insert_leaf rest v) None Leaf
+        | false :: rest => Node Leaf None (insert_leaf rest v)
+    end.
+  
   Fixpoint insert {A} (k : list bool) (v : option A) (t : bitwise_trie A) {struct t}
-    : bitwise_trie A. Admitted.
-
+    : bitwise_trie A :=
+    match t with
+    | Leaf => insert_leaf k v
+    | Node l d r =>
+         match k with
+        | nil => Node l v r
+        | true :: rest => Node (insert rest v l) d r
+        | false :: rest => Node l d (insert rest v r)
+         end
+    end.
+  
   Example insert_example1 : lookup [] (insert [] None (Node Leaf (Some 0) Leaf)) = None.
   Proof.
-  Admitted.
+    simplify.
+    equality.
+  Qed.
 
   Example insert_example2 : lookup [] (insert [true] (Some 2) (Node Leaf (Some 0) Leaf)) = Some 0.
   Proof.
-  Admitted.
+  simplify.
+    equality.
+  Qed.
   
   (* HINT 4 (see Pset3Sig.v) *) 
   Theorem lookup_insert {A} (k : list bool) (v : option A) (t : bitwise_trie A) :
