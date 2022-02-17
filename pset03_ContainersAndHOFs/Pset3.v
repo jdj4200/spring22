@@ -144,7 +144,9 @@ Module Impl.
   Proof.
     simplify.
     f_equal.
-    Qed.
+  Qed.
+
+  Check fun_ext'.
 
   (* On the other hand, note that the other direction does not hold, because
      if a subtraction on natural numbers underflows, it just returns 0, so
@@ -153,7 +155,7 @@ Module Impl.
   Example minus2plus2: ~ left_inverse (fun (x: nat) => x - 2) (fun (x: nat) => x + 2).
   Proof.
 
-    unfold not.
+    (*unfold not.
     unfold left_inverse.
     unfold compose.
     propositional.
@@ -161,10 +163,9 @@ Module Impl.
     rewrite fun_ext with (f := (fun x : nat => x - 2 + 2)) (g := (fun x : nat => x)) in H.
     Focus 2.
     rewrite fun_ext' with (g := (fun x : nat => x)) in H.
-    replace (fun x : nat => x - 0 + 0) with (fun x : nat => x)  in H by linear_arithmetic.
     contradiction.
     rewrite f_equal.
-    rewrite fun_ext.
+    rewrite fun_ext.*)
   Admitted.
 
   (* Let us make the intuition from the previous paragraph more
@@ -178,7 +179,15 @@ Module Impl.
       left_inverse f g ->
       (forall x y, f x = f y -> x = y).
   Proof.
-  Admitted.
+    simplify.
+    unfold left_inverse in H.
+    assert ((g ∘ f) x = (g ∘ f) y).
+    unfold compose.
+    apply f_equal.
+    assumption.
+    rewrite H in H1.
+    equality.
+    Qed.
 
   (* Bonus question (no points): can you prove the reverse;
      i.e., can you prove that all injective functions have left
@@ -189,8 +198,32 @@ Module Impl.
      type arguments explicitly, because otherwise Coq would not be able to infer them." *)
   Lemma left_inverse_id: forall A, left_inverse (@id A) (@id A).
   Proof.
-  Admitted.
+    simplify.
+    unfold left_inverse.
+    unfold compose.
+    unfold id.
+    equality.
+  Qed.
 
+  Lemma selfCompose_swap{A: Type}: forall (f: A -> A) (n: nat),
+      f ∘ selfCompose f n = selfCompose f n ∘ f.
+  Proof.
+    induct n; simplify.
+    equality.
+
+    rewrite IHn.
+    rewrite compose_assoc.
+    rewrite IHn.
+    equality.
+  Qed.
+
+  Lemma compose_assoc_reverse: forall A B C D (f: A -> B) (g: B -> C) (h: C -> D),
+      h ∘ g ∘ f = h ∘ (g ∘ f).
+  Proof.
+    simplify.
+    apply compose_assoc.
+    Qed.
+  
   (* Now we can start proving interesting facts about inverse functions: *)
   (* Here's how to invert the power function: *)
   (* HINT 2 (see Pset3Sig.v) *)  
@@ -198,7 +231,21 @@ Module Impl.
       left_inverse f g ->
       left_inverse (selfCompose f n) (selfCompose g n).
   Proof.
-  Admitted.
+    induct n; simplify.
+    apply left_inverse_id.
+
+    unfold left_inverse.
+    propositional.
+    unfold left_inverse in H0.
+    unfold left_inverse in H.
+    
+    rewrite selfCompose_swap.
+    rewrite compose_assoc.
+    rewrite compose_assoc_reverse with (h := (selfCompose g n)).
+    rewrite H.
+    rewrite compose_id_r.
+    assumption.
+    Qed.
 
   (** ** Polymorphic container types *)
 
@@ -241,17 +288,29 @@ Module Impl.
    * this operation does: the argument [k] is a path, in which
    * [true] means "go left" and [false] means "go right".
    *)
-  Fixpoint lookup {A} (k : list bool) (t : bitwise_trie A) {struct t} : option A. Admitted.
+  
+  Fixpoint lookup {A} (k : list bool) (t : bitwise_trie A) {struct t} : option A :=
+    match t with
+    | Leaf => None
+    | Node l d r =>
+        match k with
+        | nil => d
+        | true :: rest => lookup rest l
+        | false :: rest => lookup rest r
+        end
+   end.
 
   Example lookup_example1 : lookup [] (Node Leaf (None : option nat) Leaf) = None.
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   Example lookup_example2 : lookup [false; true]
       (Node (Node Leaf (Some 2) Leaf) None (Node (Node Leaf (Some 1) Leaf) (Some 3) Leaf))
                             = Some 1.
   Proof.
-  Admitted.
+    equality.
+    Qed.
 
   (* [Leaf] represents an empty bitwise trie, so a lookup for
    * any key should return [None].
