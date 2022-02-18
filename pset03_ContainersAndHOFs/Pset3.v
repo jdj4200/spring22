@@ -615,22 +615,47 @@ Module Impl.
    * structure intact.
    *)
   Fixpoint tree_map {A B : Type} (f : A -> B) (t : tree A)
-    : tree B. Admitted.
+    : tree B :=
+    match t with
+    | Leaf => Leaf
+    | Node l d r => Node (tree_map f l) (f d) (tree_map f r)
+    end.
 
   Example tree_map_example :
     tree_map (fun x => x + 1) (Node (Node Leaf 1 Leaf) 2 (Node Leaf 3 (Node Leaf 4 Leaf)))
     = (Node (Node Leaf 2 Leaf) 3 (Node Leaf 4 (Node Leaf 5 Leaf))).
   Proof.
-  Admitted.
+    equality.
+  Qed.
 
   (* [tree_map_flatten] shows that [map]
    * and [tree_map] are related by the [flatten] function.
    *)
   (* HINT 6 (see Pset3Sig.v) *)
+
+  Lemma map_concat{A B : Type}: forall (l1 l2 : list A) (f: A -> B),
+      map f (l1 ++ l2) = (map f l1) ++ (map f l2).
+  Proof.
+    induct l1; simplify.
+    equality.
+    rewrite IHl1.
+    equality.
+  Qed.
+  
   Theorem tree_map_flatten : forall {A B : Type} (f : A -> B) (t : tree A),
       flatten (tree_map f t) = map f (flatten t).
   Proof.
-  Admitted.
+    induct t; simplify.
+    equality.
+
+    rewrite IHt1.
+    rewrite IHt2.
+
+    Search map.
+    rewrite map_concat.
+    rewrite map_cons.
+    equality.
+  Qed.
 
   (* This function asserts that a predicate holds over all
      elements of a tree. *)
@@ -643,30 +668,48 @@ Module Impl.
   (* Define a similar function for the [exists] case; that is, define
      a function that asserts that a predicate holds for at least
      one value of a tree. *)
-  Fixpoint tree_exists {A} (P: A -> Prop) (tr: tree A) {struct tr} : Prop.
-  Admitted.
+  Fixpoint tree_exists {A} (P: A -> Prop) (tr: tree A) {struct tr} : Prop :=
+    match tr with
+    | Leaf => False
+    | Node l d r => tree_exists P l \/ P d \/ tree_exists P r
+    end.
 
   (* Two sanity checks for your function: *)
   Lemma tree_exists_Leaf {A} (P: A -> Prop):
     ~ tree_exists P Leaf.
   Proof.
-  Admitted.
+    equality.
+  Qed.
 
   Lemma tree_forall_exists {A} (P: A -> Prop):
     forall tr, tr <> Leaf -> tree_forall P tr -> tree_exists P tr.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    equality.
+    propositional.
+  Qed.
 
   (* What does the following theorem mean? Write a short
      explanation below. *)
-
+  (* If all the elements in a tree tr satisfy proposition P, and there exists an element
+     d in tr, then d satisfies P.*)
   Lemma tree_forall_sound {A} (P: A -> Prop):
     forall tr, tree_forall P tr ->
           forall d, tree_exists (fun d' => d' = d) tr ->
                P d.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    propositional.
+    propositional.
+    apply H0.
+    assumption.
 
+    replace d0 with d by equality.
+    apply H.
+
+    apply H4.
+    assumption.
+  Qed.
   (** ** Binary search trees **)
 
   (* Like tries, binary search trees (BSTs) are a popular way to
