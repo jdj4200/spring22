@@ -435,20 +435,119 @@ Module Impl.
       lookup k t1 = Some v ->
       lookup k (merge t1 t2) = Some v.
   Proof.
-  Admitted.
+    induct t1; simplify.
+    equality.
+
+    cases k; simplify.
+    cases t2; simplify.
+    equality.
+    cases d; equality.
+
+    cases t2; simplify.
+    equality.
+
+    cases b; simplify.
+    apply IHt1_1.
+    assumption.
+    apply IHt1_2.
+    assumption.
+  Qed.
 
   Theorem lookup_merge_None {A} : forall (t1 t2 : bitwise_trie A) k,
       lookup k (merge t1 t2) = None ->
       lookup k t1 = None /\ lookup k t2 = None.
   Proof.
-  Admitted.
-  
+    simplify.
+    split.
+
+    induct t1; simplify.
+    equality.
+    cases k; simplify.
+    cases t2; simplify.
+    assumption.
+    cases d; simplify.
+    assumption.
+    equality.
+
+    cases b; simplify.
+    cases t2; simplify.
+    assumption.
+    apply IHt1_1 with t2_1.
+    assumption.
+
+    cases t2; simplify.
+    assumption.
+    apply IHt1_2 with t2_2.
+    assumption.
+    
+
+    induct t1; simplify.
+    equality.
+    cases t2; simplify.
+    equality.
+    cases k; simplify.
+    cases d; simplify.
+    equality.
+    assumption.
+    cases b; simplify.
+    apply IHt1_1.
+    equality.
+    apply IHt1_2.
+    equality.
+  Qed.
+
+  Lemma merge_id {A} : forall (t1 : bitwise_trie A),
+      merge t1 t1 = t1.
+  Proof.
+    induct t1; simplify.
+    equality.
+    rewrite IHt1_1.
+    rewrite IHt1_2.
+    cases d; simplify; equality.
+  Qed.
+       
+  Lemma merge_idempotent {A} : forall (t1 t2 : bitwise_trie A),
+      merge t1 (merge t1 t2) = merge t1 t2.
+  Proof.
+    induct t1; simplify.
+    equality.
+
+    cases t2; simplify.
+    cases d; simplify.
+    rewrite merge_id.
+    rewrite merge_id.
+    equality.
+
+    rewrite merge_id.
+    rewrite merge_id.
+    equality.
+
+    rewrite IHt1_1.
+    rewrite IHt1_2.
+
+    cases d; simplify; equality.
+  Qed.
   (* HINT 5 (see Pset3Sig.v) *)
   Theorem merge_selfCompose {A} : forall n (t1 t2 : bitwise_trie A),
       0 < n ->
       selfCompose (merge t1) n t2 = merge t1 t2.
   Proof.
-  Admitted.
+    induct n; simplify.
+    linear_arithmetic.
+
+
+    assert (n = 0 \/ 0 < n) by linear_arithmetic.
+    cases H0.
+
+    rewrite H0.
+    simplify.
+    equality.
+    
+    unfold compose.
+    rewrite IHn.
+    apply merge_idempotent.
+    assumption.
+  Qed.
   
   (* Define an operation to "mirror" that takes a tree (not necessarily a 
    * trie) and returns the mirrored version of the tree.
