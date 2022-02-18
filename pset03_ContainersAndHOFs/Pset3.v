@@ -140,33 +140,27 @@ Module Impl.
     equality.
   Qed.
 
-  Lemma fun_ext': forall {A B: Type}, forall (f g: A -> B), forall x,  f = g -> f x = g x.
+  Lemma fun_neq: forall (x : nat) (f g : nat -> nat), f x <> g x -> f <> g.
   Proof.
     simplify.
-    f_equal.
+    equality.
   Qed.
-
-  Check fun_ext'.
-
+  
   (* On the other hand, note that the other direction does not hold, because
      if a subtraction on natural numbers underflows, it just returns 0, so
      there are several [x] for which [x-2] returns 0 (namely 0, 1, and 2),
      so it can't have a left inverse. *)
   Example minus2plus2: ~ left_inverse (fun (x: nat) => x - 2) (fun (x: nat) => x + 2).
   Proof.
-
-    (*unfold not.
+    unfold not.
     unfold left_inverse.
-    unfold compose.
     propositional.
+    unfold compose in H.
     unfold id in H.
-    rewrite fun_ext with (f := (fun x : nat => x - 2 + 2)) (g := (fun x : nat => x)) in H.
-    Focus 2.
-    rewrite fun_ext' with (g := (fun x : nat => x)) in H.
-    contradiction.
-    rewrite f_equal.
-    rewrite fun_ext.*)
-  Admitted.
+    contradict H.
+    apply fun_neq with (x := 0).
+    linear_arithmetic.
+  Qed.
 
   (* Let us make the intuition from the previous paragraph more
      concrete, by proving that a function that is not injective
@@ -762,13 +756,39 @@ Module Impl.
      where <x> is a forall-bound name in theorem statement you're
      trying to apply and <term> is what you what to fill in for <x>.
    *)
-  
 
+  Lemma tree_forall_implies:
+  forall tr (P Q: nat -> Prop),
+    tree_forall P tr ->
+    (forall x, P x -> Q x) ->
+    tree_forall Q tr.
+  Proof.
+    induct tr; simplify; propositional.
+    apply IHtr1 with P.
+    assumption.
+    assumption.
+    apply H0.
+    assumption.
+    apply IHtr2 with P.
+    assumption.
+    assumption.
+  Qed.
+  
   (* HINT 7 (see Pset3Sig.v) *)
   Lemma bst_implies:
     forall tr s, bst tr s -> tree_forall s tr.
   Proof.
-  Admitted.
+    induct tr; simplify; propositional.
+    apply tree_forall_implies with (P := (fun x : nat => s x /\ x < d)).
+    apply IHtr1.
+    assumption.
+    propositional.
+
+    apply tree_forall_implies with (P := (fun x : nat => s x /\ d < x)).
+    apply IHtr2.
+    assumption.
+    propositional.
+  Qed.
 
   (* Next, let's prove that elements of the left subtree of a
      BST node are less than the node's data and that all
@@ -781,7 +801,23 @@ Module Impl.
       bst (Node l d r) s ->
       tree_forall (fun x => x < d) l /\ tree_forall (fun x => x > d) r.
   Proof.
-  Admitted.
+    simplify.
+    propositional.
+    assert (tree_forall(fun x : nat => s x /\ x < d) l).
+    apply bst_implies.
+    assumption.
+    apply tree_forall_implies with (P := (fun x : nat => s x /\ x < d)).
+    assumption.
+    propositional.
+
+    assert (tree_forall(fun x : nat => s x /\ d < x) r).
+    apply bst_implies.
+    assumption.
+    apply tree_forall_implies with (P := (fun x : nat => s x /\ d < x)).
+    assumption.
+    propositional.
+  Qed.
+  
 
   (* Here is another convenient property: if two sets are the
      same, then a bst representing one also represents the
@@ -793,7 +829,38 @@ Module Impl.
       (forall x, P x <-> Q x) ->
       bst tr Q.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    assert (forall x : nat, ~ P x <-> ~ Q x).
+    propositional.
+    rewrite H0 in H1.
+    apply H1.
+    assumption.
+    
+    apply  H in H2.
+    assumption.
+    apply H1.
+    apply H.
+
+    propositional.
+    rewrite H0 in H1.
+    apply H1.
+    
+    apply IHtr1 with (fun x : nat => P x /\ x < d).
+    assumption.
+    propositional.
+    rewrite H0 in H4.
+    assumption.
+    rewrite H0.
+    assumption.
+
+    apply IHtr2 with (fun x : nat => P x /\ d < x).
+    assumption.
+    propositional.
+    rewrite H0 in H4.
+    assumption.
+    rewrite H0.
+    assumption.
+  Qed.
 
   (* Let's prove something about the way we can map over binary search
      trees while preserving the bst structure. In order to preserve, the
