@@ -559,23 +559,54 @@ Module Impl.
    * list resulting from the flattening of that same tree.
  *)
   
-  Fixpoint mirror {A} (t : tree A) : tree A. Admitted.     
+  Fixpoint mirror {A} (t : tree A) : tree A :=
+    match t with
+    | Leaf => Leaf
+    | Node l d r => Node (mirror r) d (mirror l)
+    end.
 
   Example mirror_test1 :
     mirror (Node Leaf 1 (Node Leaf 2 (Node Leaf 3 Leaf))) =
     Node (Node (Node Leaf 3 Leaf) 2 Leaf) 1 Leaf.
-  Admitted.
+  Proof. equality. Qed.
   
   Theorem mirror_mirror_id {A} : forall (t : tree A),
       mirror (mirror t) = t.
   Proof.
-  Admitted.
+    induct t; simplify.
+    equality.
+    rewrite IHt1.
+    rewrite IHt2.
+    equality.
+  Qed.
+
+  Lemma rev_append{A}: forall (l : list A) (a: A), rev (a :: l) = (rev l) ++ [a].
+  Proof.
+    induct l; simplify; equality.
+  Qed.
+
+  Lemma append_middle{A}: forall (l1 l2 : list A) (a : A),
+      l1 ++ a :: l2 = (l1 ++ [a]) ++ l2.
+  Proof.
+    induct l1; simplify; equality.
+  Qed.
   
   Theorem flatten_mirror_rev {A} : forall (t : tree A),
       flatten (mirror t) = rev (flatten t).
   Proof.
-  Admitted.
+    induct t; simplify.
+    equality.
 
+    rewrite IHt1.
+    rewrite IHt2.
+
+    Search rev.
+    rewrite rev_app_distr.
+    rewrite rev_append.
+    rewrite append_middle.
+    equality.
+  Qed.
+  
   (** ** HOFs on lists and trees **)
   
   (* Just like we defined [map] for lists, we can similarly define
