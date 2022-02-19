@@ -594,7 +594,6 @@ Module Impl.
     rewrite IHt1.
     rewrite IHt2.
 
-    Search rev.
     rewrite rev_app_distr.
     rewrite rev_append.
     rewrite append_middle.
@@ -645,7 +644,6 @@ Module Impl.
     rewrite IHt1.
     rewrite IHt2.
 
-    Search map.
     rewrite map_concat.
     rewrite map_cons.
     equality.
@@ -817,7 +815,6 @@ Module Impl.
     assumption.
     propositional.
   Qed.
-  
 
   (* Here is another convenient property: if two sets are the
      same, then a bst representing one also represents the
@@ -881,7 +878,58 @@ Module Impl.
       (forall x, P x <-> Q (f x)) ->
       bst (tree_map f tr) Q.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    assert (~ P (g x)).
+    apply H.
+    unfold left_inverse in H0.
+    assert (x = f (g x)).
+    replace (f (g x)) with ((f ∘ g) x) by equality.
+    rewrite  H0.
+    equality.
+    rewrite H4.
+    assert (forall x : nat, ~P x <-> ~Q (f x)).
+    propositional.
+    apply H2 in H6.
+    apply H5 in H6.
+    assumption.
+    apply H2 in H6.
+    apply H5 in H6.
+    assumption.
+    apply H5 with (x := (g x)).
+    assumption.
+
+    propositional.
+    apply H2.
+    assumption.
+    
+    apply IHtr1 with (P := (fun x : nat => P x /\ x < d)) (g := g).
+    assumption.
+    assumption.
+    assumption.
+    propositional.
+    apply H2.
+    assumption.
+    apply H1 with (x := x) (y := d).
+    assumption.
+    apply H2.
+    assumption.
+    apply H1 with (x := x) (y := d).
+    assumption.
+
+    apply IHtr2 with (P := (fun x : nat => P x /\ d < x)) (g := g).
+    assumption.
+    assumption.
+    assumption.
+    propositional.
+    apply H2.
+    assumption.
+    apply H1 with (x := d) (y := x).
+    assumption.
+    apply H2.
+    assumption.
+    apply H1 with (x := d) (y := x).
+    assumption.
+  Qed.
 
   (* Monotone functions can be characterized as monotone increasing or 
      monotone decreasing. In the case of a strictly monotonically decreasing
@@ -901,7 +949,58 @@ Module Impl.
       (forall x, P x <-> Q (f x)) ->
       bst (mirror (tree_map f tr)) Q.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    assert (~ P (g x)).
+    apply H.
+    unfold left_inverse in H0.
+    assert (x = f (g x)).
+    replace (f (g x)) with ((f ∘ g) x) by equality.
+    rewrite  H0.
+    equality.
+    rewrite H4.
+    assert (forall x : nat, ~P x <-> ~Q (f x)).
+    propositional.
+    apply H2 in H6.
+    apply H5 in H6.
+    assumption.
+    apply H2 in H6.
+    apply H5 in H6.
+    assumption.
+    apply H5 with (x := (g x)).
+    assumption.
+
+    propositional.
+    apply H2.
+    assumption.
+    
+    apply IHtr2 with (P := (fun x : nat => P x /\ d < x)) (g := g).
+    assumption.
+    assumption.
+    assumption.
+    propositional.
+    apply H2.
+    assumption.
+    apply H1 with (x := d) (y := x).
+    assumption.
+    apply H2.
+    assumption.
+    apply H1 with (x := d) (y := x).
+    assumption.
+
+    apply IHtr1 with (P := (fun x : nat => P x /\ x < d)) (g := g).
+    assumption.
+    assumption.
+    assumption.
+    propositional.
+    apply H2.
+    assumption.
+    apply H1 with (x := x) (y := d).
+    assumption.
+    apply H2.
+    assumption.
+    apply H1 with (x := x) (y := d).
+    assumption.
+  Qed.
   
   (* [member] computes whether [a] is in [tr], but to do so it *relies* on the
      [bst] property -- if [tr] is not a valid binary search tree, [member]
@@ -918,11 +1017,120 @@ Module Impl.
       end
     end.
 
+  Lemma tree_forall_implies_false: forall tr (P Q : nat -> Prop),
+      tree_forall P tr ->
+        (forall x, P x -> ~Q x) ->
+        ~ tree_exists Q tr.
+  Proof.
+    induct tr; simplify; propositional.
+    apply IHtr1 with (P := P) (Q := Q).
+    assumption.
+    assumption.
+    assumption.
+
+    apply H0 with d.
+    assumption.
+    assumption.
+
+    apply IHtr2 with (P := P) (Q := Q).
+    assumption.
+    assumption.
+    assumption.
+  Qed.
+  
+  Lemma member_bst_exists: forall tr s a,
+      bst tr s -> bst_member a tr = true <-> tree_exists (fun x => x = a) tr.
+  Proof.
+    induct tr; simplify.
+    equality.
+
+    cases (compare a d).
+    propositional.
+    left.
+    apply IHtr1 with (fun x : nat => s x /\ x < d).
+    assumption.
+    assumption.
+    apply IHtr1 with (fun x : nat => s x /\ x < d).
+    assumption.
+    assumption.
+
+    linear_arithmetic.
+
+    apply bst_implies in H2.
+
+    apply tree_forall_implies_false with (Q := (fun x : nat => x = a)) in H2.
+    equality.
+    linear_arithmetic.
+    
+    propositional.
+    right.
+    left.
+    equality.
+
+    propositional.
+    right.
+    right.
+
+    apply IHtr2 with (fun x : nat => s x /\ d < x).
+    assumption.
+    assumption.
+
+    apply bst_implies in H.
+    apply tree_forall_implies_false with (Q := (fun x : nat => x = a)) in H.
+    equality.
+    linear_arithmetic.
+
+    linear_arithmetic.
+    
+    apply IHtr2 with (fun x : nat => s x /\ d < x).
+    assumption.
+    assumption.
+  Qed.
+
+  
   Lemma member_bst : forall tr s a,
       bst tr s -> bst_member a tr = true <-> s a.
   Proof.
-  Admitted.
+    induct tr; simplify.
+    propositional.
+    equality.
+    apply H in H0.
+    equality.
+    
+    cases (compare a d); simplify.
+    propositional.
 
+ 
+    rewrite member_bst_exists with (s := (fun x : nat => s x /\ x < d))  in H1.
+    apply bst_implies in H.
+    apply tree_forall_sound with (d := a) in H.
+    equality.
+
+    apply H1.
+    assumption.
+
+    rewrite IHtr1 with (s := (fun x : nat => s x /\ x < d)).
+    propositional.
+    assumption.
+    
+    propositional.
+    equality.
+    
+
+    propositional.
+    rewrite member_bst_exists with (s := (fun x : nat => s x /\ d < x)) in H1.
+    apply bst_implies in H2 as H3.
+    apply tree_forall_sound with (d := a) in H3.
+    propositional.
+
+    apply H1.
+    assumption.
+
+    rewrite IHtr2 with (s := (fun x : nat => s x /\ d < x)).
+    propositional.
+    assumption.
+  Qed.
+  
   (* Next week, we will look at insertion and deletion in
      BSTs. *)
 
