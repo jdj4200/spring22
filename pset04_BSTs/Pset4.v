@@ -80,6 +80,9 @@ Module Impl.
 
   (* Helper functions for [delete] below. The *main task* in this pset
      is to understand, specify, and prove these helpers. *)
+
+  (* [rightmost] finds the value of the rightmost node in [tr] or None if [tr] is a Leaf.
+     This does not rely on the bst property; it works on any tree.*)
   Fixpoint rightmost (tr: tree) : option t :=
     match tr with
     | Leaf => None
@@ -89,8 +92,13 @@ Module Impl.
       | r => r
       end
     end.
+
+  (* A simple helper function that returns if [tr] is a Leaf node. *)
   Definition is_leaf (tr : tree) : bool :=
     match tr with Leaf => true | _ => false end.
+
+  (* [delete_rightmost] deletes the rightmost node in [tr] or does nothing  if [tr] is a Leaf.
+     This does not rely on the bst property; it works on any tree.*)
   Fixpoint delete_rightmost (tr: tree) : tree :=
     match tr with
     | Leaf => Leaf
@@ -99,6 +107,7 @@ Module Impl.
       then lt
       else Node v lt (delete_rightmost rt)
     end.
+  
   Definition merge_ordered lt rt :=
     match rightmost lt with
     | Some rv => Node rv (delete_rightmost lt) rt
@@ -286,6 +295,199 @@ Module Impl.
      function, or (when applicable) one lemma per multiple functions. However,
      the lemmas you prove about one function need to specify everything a caller
      would need to know about this function. *)
+
+  Lemma bst_member: forall tr s d, bst tr s -> member d tr = true -> s d.
+  Proof.
+    induct tr; simplify.
+    equality.
+
+    propositional.
+    
+    cases (compare d0 d).
+
+    assert (d0 < d \/ d0 = d \/ d0 > d).  
+    apply Nat.lt_total.
+    cases H2.
+
+    assert (member d0 tr1 = true -> (fun x : t => s x /\ x < d) d0).
+    apply IHtr1 with (s := (fun x : t => s x /\ x < d)).
+    assumption.
+    propositional.
+    apply H5.
+    propositional.
+    equality.
+
+    linear_arithmetic.
+    equality.
+
+    assert (member d0 tr2 = true -> (fun x : t => s x /\ d < x) d0).
+    apply IHtr2 with (s := (fun x : t => s x /\ d < x)).
+    assumption.
+    propositional.
+    apply H4.
+  Qed.
+
+  Lemma rightmost_member: forall tr s d, bst tr s ->
+                                         rightmost tr = Some d -> member d tr = true.
+  Proof.
+    induct tr; simplify.
+    equality.
+
+    cases (compare d0 d); simplify.
+    propositional.
+
+    cases (rightmost tr2).
+
+    assert (member d0 tr2 = true).
+    apply IHtr2 with (fun x : t => s x /\ d < x).
+    assumption.
+    assumption.
+    apply bst_member with (tr := tr2) (d := d0) (s := (fun x : t => s x /\ d < x)) in H2.
+    propositional.
+    linear_arithmetic.
+    assumption.
+
+    assert (d = d0) by equality.
+    linear_arithmetic.
+    equality.
+
+    cases (rightmost tr2); simplify.
+    propositional.
+    apply IHtr2 with (fun x : t => s x /\ d < x).
+    assumption.
+    assumption.
+
+    assert (d = d0) by equality.
+    linear_arithmetic.
+  Qed.
+
+  Lemma rightmost_not_leaf: forall tr d, rightmost tr = Some d -> is_leaf tr = false.
+  Proof.
+    simplify.
+    induct tr; simplify.
+    equality.
+    propositional.
+  Qed.
+
+  Lemma rightmost_greatest: forall tr s n, bst tr s -> rightmost tr = Some n ->
+                                           bst tr (fun x : t => s x /\ x <= n).
+  Proof.
+    induct tr; simplify.
+    equality.
+    propositional.
+    cases (rightmost tr2); simplify.
+
+    apply bst_member with (s:= (fun x : t => s x /\ d < x))(d := n) in H3.
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => s x /\ d < x)).
+    assumption.
+    rewrite H0 in Heq.
+    assumption.
+
+    assert (d = n) by equality.
+    linear_arithmetic.
+
+    cases (rightmost tr2); simplify.
+    apply bst_iff with (P := (fun x : t => s x /\ x < d)).
+    assumption.
+    propositional.
+    apply bst_member with (s:= (fun x : t => s x /\ d < x))(d := n) in H3.
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => s x /\ d < x)).
+    assumption.
+    rewrite H0 in Heq.
+    assumption.
+
+    assert (d = n) by equality.
+    apply bst_iff with (P := (fun x : t => s x /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+
+    cases (rightmost tr2); simplify.
+    remember (fun x : t => s x /\ d < x).
+    assert (bst tr2 (fun x : t => P x /\ x <= n)).
+    apply IHtr2.
+    assumption.
+    assumption.
+    apply bst_iff with (P := (fun x : t => P x /\ x <= n)).
+    assumption.
+    rewrite HeqP.
+    propositional.
+
+    cases tr2; simplify.
+    propositional.
+    apply H3 with x.
+    propositional.
+
+    cases (rightmost tr2_2); equality.
+  Qed.
+
+  (*Lemma bst_delete_rightmost: forall tr s, bst tr s -> right 
+                              bst (delete_rightmost (fun x : t -> s x /\*)
+  
+  Lemma bst_merge_ordered: forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
+                                             bst rt (fun x : t => s x /\ d < x) ->
+                             bst (merge_ordered lt rt) (fun x : t => s x /\ x <> d).
+  Proof.
+    simplify.
+    induct lt; simplify.
+    unfold merge_ordered.
+    simplify.
+    apply bst_iff with (fun x : t => s x /\ d < x).
+    assumption.
+    simplify.
+    assert (~ (s x /\ x < d)).
+    apply H.
+    propositional.
+    linear_arithmetic.
+    assert (x < d \/ x = d \/ x > d).  
+    apply Nat.lt_total.
+    propositional.
+
+    propositional.
+    unfold merge_ordered.
+    simplify.
+    cases (rightmost lt2); simplify.
+    propositional.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    assumption.
+    assumption.
+
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+
+    cases (is_leaf lt2); simplify.
+    apply rightmost_not_leaf in Heq.
+    equality.
+
+    propositional.
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    assumption.
+    assumption.
+
+    apply bst_iff with (P := (fun x : t => (s x /\ x < d0) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    linear_arithmetic.
+
+    
 
   (* HINT 2-5 (see Pset4Sig.v) *)
   Lemma bst_delete : forall tr s a, bst tr s ->
