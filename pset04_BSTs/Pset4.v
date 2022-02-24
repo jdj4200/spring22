@@ -190,11 +190,41 @@ Module Impl.
      tree in cases where the expected structure is not present. *)
   
   (* HINT 1 (see Pset4Sig.v) *)
-  Definition rotate (T : tree) : tree.
-  Admitted.
+  Definition rotate (T : tree) : tree :=
+    match T with
+    | Leaf => Leaf
+    | Node v lt rt =>
+        match lt with
+        | Leaf => T
+        | Node lv llt lrt => Node lv llt (Node v lrt rt)
+        end
+    end.
 
   Lemma bst_rotate T s (H : bst T s) : bst (rotate T) s.
-  Admitted.
+  Proof.
+    cases T; simplify.
+    apply H.
+    propositional.
+    cases T1; simplify.
+    propositional.
+    split.
+    apply H.
+    split.
+    apply bst_iff with (fun x : t => (s x /\ x < d) /\ x < d0).
+    apply H.
+    propositional.
+    linear_arithmetic.
+    propositional.
+    apply bst_iff with (fun x : t => (s x /\ x < d) /\ d0 < x).
+    apply H5.
+    simplify.
+    equality.
+    apply bst_iff with (fun x : t => s x /\ d < x).
+    assumption.
+    simplify.
+    propositional.
+    linear_arithmetic.
+  Qed.
 
   (* There is a hint in the signature file that completely gives away the proofs
    * of these rotations. We recommend you study that code after completing this
@@ -203,7 +233,47 @@ Module Impl.
   Lemma bst_insert : forall tr s a, bst tr s ->
     bst (insert a tr) (fun x => s x \/ x = a).
   Proof.
-  Admitted.
+    simplify.
+    induct tr; simplify; propositional.
+    apply H with x.
+    assumption.
+    contradict H0.
+    linear_arithmetic.
+    apply H with x.
+    assumption.
+    contradict H0.
+    linear_arithmetic.
+
+    cases (compare a d); simplify; propositional.
+    apply bst_iff with (fun x : t => (s x /\ x < d) \/ x = a).
+    apply IHtr1.
+    assumption.
+    propositional.
+    linear_arithmetic.
+    apply bst_iff with (fun x : t => s x /\ d < x).
+    assumption.
+    propositional.
+    contradict H1.
+    linear_arithmetic.
+    apply bst_iff with (fun x : t => s x /\ x < d).
+    assumption.
+    propositional.
+    equality.
+    apply bst_iff with (fun x : t => s x /\ d < x).
+    assumption.
+    propositional.
+    equality.
+    apply bst_iff with (fun x : t => s x /\ x < d).
+    assumption.
+    propositional.
+    contradict H1.
+    linear_arithmetic.
+    apply bst_iff with (fun x : t => (s x /\ d < x) \/ x = a).
+    apply IHtr2.
+    assumption.
+    propositional.
+    linear_arithmetic.
+  Qed.
 
   (* To prove [bst_delete], you will need to write specifications for its helper
      functions, find suitable statements for proving correctness by induction, and use
@@ -221,6 +291,43 @@ Module Impl.
   Lemma bst_delete : forall tr s a, bst tr s ->
     bst (delete a tr) (fun x => s x /\ x <> a).
   Proof.
+    induct tr; simplify.
+    propositional.
+    apply H with x.
+    assumption.
+
+    propositional.
+    cases (compare a d); simplify; propositional.
+    linear_arithmetic.
+
+    apply bst_iff with (fun x : t => ((s x /\ x < d) /\ (x = a -> False))).
+    apply IHtr1 with (a := a) ( s := (fun x : t => s x /\ x < d)).
+    assumption.
+    propositional.
+
+    apply bst_iff with (fun x : t => (s x /\ d < x)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+
+    Focus 2.
+    linear_arithmetic.
+
+    Focus 2.
+    apply bst_iff with (fun x : t => (s x /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+
+    Focus 2.
+    apply bst_iff with (fun x : t => ((s x /\ d < x) /\ (x = a -> False))).
+    apply IHtr2 with (a := a) ( s := (fun x : t => s x /\ d < x)).
+    assumption.
+    propositional.
+
+    unfold merge_ordered.
+    cases (rightmost tr1); simplify; propositional.
+    
   Admitted.
 
   (* Great job! Now you have proven all tree-structure-manipulating operations
