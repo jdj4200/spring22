@@ -135,6 +135,13 @@ Module Impl.
       end
     end.
 
+  Fixpoint traversal (tr: tree) : list t :=
+    match tr with
+    | Leaf => nil
+    | Node v lt rt => (traversal lt) ++ (v :: (traversal rt))
+    end.
+
+  
   (* Here is a lemma that you will almost definitely want to use. *)
   Example bst_iff : forall tr P Q, bst tr P -> (forall x, P x <-> Q x) -> bst tr Q.
   Proof.
@@ -509,8 +516,52 @@ Module Impl.
     equality.
   Qed.
 
+  (* Lemma bst_member_iff: forall tr (P Q : t -> Prop), bst tr P ->
+                                       (forall x, member x tr = true -> Q x) -> bst tr Q.
+  Proof.
+    induct tr; simplify.
+   *)
+
+  Lemma bst_weaker: forall tr P Q, bst tr (fun x : t => P x \/ Q x) -> bst tr P.
+  Proof.
+    induct tr; simplify.
+    assert (~ ( P x \/ Q x)).
+    apply H.
+    propositional.
+    
+    propositional.
+    apply bst_iff with (Q := (fun x : t =>(P x /\ x < d) \/ (Q x /\ x < d))) in H.
+    apply IHtr1 with (Q := (fun x : t => (Q x /\ x < d))).
+    assumption.
+    propositional.
+
+    apply bst_iff with (Q := (fun x : t =>(P x /\ d < x) \/ (Q x /\ d < x))) in H2.
+    apply IHtr2 with (Q := (fun x : t => (Q x /\ d < x))).
+    assumption.
+    propositional.
+  Admitted.
+
+  Lemma traversal_leaf: forall tr, [] = traversal tr -> is_leaf tr = true.
+  Proof.
+    simplify.
+    cases tr; simplify.
+    equality.
+    cases tr2; simplify.
+    cases tr1; simplify.
+    equality.
+    Search nil.
+
+  Lemma bst_traversal: forall tr1 tr2 s, bst tr1 s -> traversal tr1 = traversal tr2
+                                         -> bst tr2 s.
+  Proof.
+    induct tr1; simplify.
+    unfold traversal in H0.
+    simplify.
+
+
   Lemma bst_merge_ordered': forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
-                                             bst rt (fun x : t => s x /\ d < x) ->
+                                              bst rt (fun x : t => s x /\ d < x) ->
+                                              rightmost lt = Some d ->
                              bst (merge_ordered lt rt) (fun x : t => s x /\ x <> d).
   Proof.
     simplify.
@@ -544,7 +595,19 @@ Module Impl.
     apply Nat.lt_total.
     propositional.
     assumption.
-Admitted.
+
+    assert (n = d) by equality.
+    subst.
+
+    assert (s x /\ d < x -> False).
+    apply H0.
+    propositional.
+
+    equality.
+
+    propositional.
+    Admitted.
+    
     
   
   Lemma bst_merge_ordered: forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
@@ -624,6 +687,13 @@ Admitted.
     apply rightmost_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
     apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
     propositional.
+    Search and.
+
+    apply bst_iff with (P := (fun x : t => s x /\ d0 < x)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    linear_arithmetic.
     
 Admitted.    
 
@@ -649,6 +719,9 @@ Admitted.
     assumption.
     propositional.
     linear_arithmetic.
+
+    applu
+    apply bst_member with (s := 
 
     linear_arithmetic.
 
