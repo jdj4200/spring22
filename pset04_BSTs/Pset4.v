@@ -97,7 +97,7 @@ Module Impl.
   Definition is_leaf (tr : tree) : bool :=
     match tr with Leaf => true | _ => false end.
 
-  (* [delete_rightmost] deletes the rightmost node in [tr] or does nothing  if [tr] is a Leaf.
+  (* [delete_rightmost] deletes the rightmost node in [tr] or does nothing if [tr] is a Leaf.
      This does not rely on the bst property; it works on any tree.*)
   Fixpoint delete_rightmost (tr: tree) : tree :=
     match tr with
@@ -107,7 +107,9 @@ Module Impl.
       then lt
       else Node v lt (delete_rightmost rt)
     end.
-  
+
+  (* [merge_ordered] combines [lt] and [rt] by using the rightmost node in [lt] as the root of the merged tree.
+     It preserves the order left-to-right traversal order of [lt] [rt].*)
   Definition merge_ordered lt rt :=
     match rightmost lt with
     | Some rv => Node rv (delete_rightmost lt) rt
@@ -374,9 +376,7 @@ Module Impl.
     simplify.
     cases tr; simplify.
     equality.
-    cases (rightmost tr2); simplify.
-    equality.
-    equality.
+    cases (rightmost tr2); simplify; equality.
   Qed.
 
   Lemma bst_delete_rightmost: forall tr s d, bst tr s -> rightmost tr = Some d ->
