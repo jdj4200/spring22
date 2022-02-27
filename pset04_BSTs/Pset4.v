@@ -135,13 +135,6 @@ Module Impl.
       end
     end.
 
-  Fixpoint traversal (tr: tree) : list t :=
-    match tr with
-    | Leaf => nil
-    | Node v lt rt => (traversal lt) ++ (v :: (traversal rt))
-    end.
-
-  
   (* Here is a lemma that you will almost definitely want to use. *)
   Example bst_iff : forall tr P Q, bst tr P -> (forall x, P x <-> Q x) -> bst tr Q.
   Proof.
@@ -302,6 +295,44 @@ Module Impl.
      function, or (when applicable) one lemma per multiple functions. However,
      the lemmas you prove about one function need to specify everything a caller
      would need to know about this function. *)
+
+  (*Lemma bst_if_member: forall tr s,
+      (forall x, member x tr  = true <-> s x) <-> bst tr s.
+  Proof.
+    induct tr; simplify.
+    propositional.
+    assert (false = true <-> s x).
+    apply H.
+    propositional.
+    equality.
+    equality.
+    assert (s x -> False).
+    apply H.
+    propositional.
+
+    propositional.
+    assert (match compare d d with
+      | inleft (left _) => member d tr1
+      | inleft (right _) => true
+      | inright _ => member d tr2
+      end = true <-> s d).
+    apply H.
+    cases (compare d d); simplify.
+    linear_arithmetic.
+    propositional.
+    linear_arithmetic.
+    apply IHtr1.
+    intros.
+    assert (match compare x d with
+      | inleft (left _) => member x tr1
+      | inleft (right _) => true
+      | inright _ => member x tr2
+            end = true <-> s x).
+    apply H.
+    cases (compare x d); simplify.
+    propositional.
+    propositional.
+    propositional.*)
 
   Lemma bst_member: forall tr s d, bst tr s -> member d tr = true -> s d.
   Proof.
@@ -516,99 +547,349 @@ Module Impl.
     equality.
   Qed.
 
-  (* Lemma bst_member_iff: forall tr (P Q : t -> Prop), bst tr P ->
-                                       (forall x, member x tr = true -> Q x) -> bst tr Q.
+  Lemma bst_delete_rightmost': forall tr ltr rtr s d n,
+      bst (delete_rightmost tr) (fun x : t => s x /\ x < d) ->
+      rightmost tr = Some d -> tr = Node n ltr rtr -> bst tr s.
   Proof.
     induct tr; simplify.
-   *)
+    equality.
 
-  Lemma bst_weaker: forall tr P Q, bst tr (fun x : t => P x \/ Q x) -> bst tr P.
-  Proof.
-    induct tr; simplify.
-    assert (~ ( P x \/ Q x)).
-    apply H.
+    cases (rightmost tr2); simplify.
+    cases (is_leaf tr2); simplify.
+    apply rightmost_not_leaf in Heq.
+    equality.
+
     propositional.
+    apply bst_iff with (P := (fun x : t => (s x /\ x < d0) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+
+    cases tr2.
+    simplify.
+    equality.
     
-    propositional.
-    apply bst_iff with (Q := (fun x : t =>(P x /\ x < d) \/ (Q x /\ x < d))) in H.
-    apply IHtr1 with (Q := (fun x : t => (Q x /\ x < d))).
+    apply IHtr2 with (d := d0) (ltr := tr2_1) (rtr := tr2_2) (n := d1).
+    apply bst_iff with (P := (fun x : t => (s x /\ x < d0) /\ d < x)).
     assumption.
     propositional.
-
-    apply bst_iff with (Q := (fun x : t =>(P x /\ d < x) \/ (Q x /\ d < x))) in H2.
-    apply IHtr2 with (Q := (fun x : t => (Q x /\ d < x))).
     assumption.
-    propositional.
-  Admitted.
+    equality.
 
-  Lemma traversal_leaf: forall tr, [] = traversal tr -> is_leaf tr = true.
+    cases (is_leaf tr2); simplify.
+    propositional.
+Admitted.    
+  
+  Lemma merge_ordered_equiv_not_leaf: forall llt rlt rt d, is_leaf rlt = false ->
+      rotate (merge_ordered (Node d llt rlt) rt) =
+       Node d llt (merge_ordered rlt rt).
+  Proof.
+    simplify.
+    unfold merge_ordered.
+    simplify.
+
+    cases (rightmost rlt); simplify.
+    cases (is_leaf rlt); simplify.
+    apply rightmost_not_leaf in Heq.
+    equality.
+    equality.
+
+    cases (is_leaf rlt); simplify.
+    cases llt; simplify.
+    equality.
+    equality.
+    apply rightmost_leaf in Heq.
+    equality.
+  Qed.
+
+  Lemma merge_ordered_equiv_leaf: forall llt rt d,
+                merge_ordered (Node d llt Leaf) rt = Node d llt (merge_ordered Leaf  rt).
+  Proof.
+    simplify.
+    unfold merge_ordered.
+    simplify.
+    equality.
+  Qed.
+
+  Lemma rightmost_singleton: forall tr n, rightmost tr = Some n
+                                          -> delete_rightmost tr = Leaf -> tr = Node n Leaf Leaf.
   Proof.
     simplify.
     cases tr; simplify.
     equality.
-    cases tr2; simplify.
-    cases tr1; simplify.
+    cases (rightmost tr2); simplify.
+    cases (is_leaf tr2); simplify.
+    apply rightmost_not_leaf in Heq.
     equality.
-    Search nil.
-
-  Lemma bst_traversal: forall tr1 tr2 s, bst tr1 s -> traversal tr1 = traversal tr2
-                                         -> bst tr2 s.
+    equality.
+    cases (is_leaf tr2); simplify.
+    cases tr2; simplify; equality.
+    apply rightmost_leaf in Heq.
+    equality.
+  Qed.
+  
+  Lemma bst_merge_ordered_leaf: forall tr s, bst (merge_ordered tr Leaf) s -> bst tr s.
   Proof.
-    induct tr1; simplify.
-    unfold traversal in H0.
+    induct tr; simplify.
+    apply H.
+    propositional.
+    unfold merge_ordered in H.
+    cases (rightmost (Node d tr1 tr2)); simplify.
+    cases (rightmost tr2); simplify.
+    cases (is_leaf tr2); simplify.
+    apply rightmost_not_leaf in Heq0 as H1.
+    equality.
+    propositional.
+    assert (n = d) by equality.
+    subst.
+    apply H.
+    cases (rightmost tr2); simplify; equality.
+
+    unfold merge_ordered in H.
+    cases (rightmost (Node d tr1 tr2)); simplify.
+    cases (rightmost tr2); simplify.
+    cases (is_leaf tr2); simplify.
+    apply rightmost_not_leaf in Heq0 as H1.
+    equality.
+    propositional.
+    apply bst_iff with (P := (fun x : t => (s x /\ x < n) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    cases (is_leaf tr2); simplify.
+    propositional.
+    apply bst_iff with (P := (fun x : t => s x /\ x < n)).
+    assumption.
+    propositional.
+    assert (n = d) by equality.
+    subst.
+    assumption.
+    assert (n = d) by equality.
+    subst.
+    assumption.
+    propositional.
+    apply bst_iff with (P := (fun x : t => (s x /\ x < n) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    cases (rightmost tr2); simplify; equality.
+
+    unfold merge_ordered in H.
+    cases (rightmost (Node d tr1 tr2)); simplify.
+    cases (rightmost tr2); simplify.
+    cases (is_leaf tr2); simplify.
+    apply rightmost_not_leaf in Heq0 as H1.
+    equality.
+    propositional.
+    
+    cases (delete_rightmost).
     simplify.
+    assert ( tr2 = Node n Leaf Leaf).
+    apply rightmost_singleton.
+    equality.
+    assumption.
+    subst.
+    simplify.
+    propositional.
+    apply H5 with x.
+    propositional.
+    apply H2 with x.
+    propositional.
+    cases tr2; simplify.
+    equality.
+    propositional.
 
+    propositional.
 
-  Lemma bst_merge_ordered': forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
-                                              bst rt (fun x : t => s x /\ d < x) ->
-                                              rightmost lt = Some d ->
+    (* Focus 2.
+    cases (is_leaf tr2); simplify.
+    propositional.
+    cases tr2; simplify.
+    assert (d = n) by equality.
+    subst.
+    propositional.
+    apply H2 with x.
+    propositional.
+    equality.
+
+    apply rightmost_leaf in Heq0.
+    equality.
+
+    Focus 2.
+    cases (rightmost tr2); simplify; equality. *)
+      
+   (* apply bst_iff with (P := (fun x : t => (s x /\ x < n) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    cases (is_leaf tr2); simplify.
+    propositional.
+    apply bst_iff with (P := (fun x : t => s x /\ x < n)).
+    assumption.
+    propositional.
+    assert (n = d) by equality.
+    subst.
+    assumption.
+    assert (n = d) by equality.
+    subst.
+    assumption.
+    propositional.
+    apply bst_iff with (P := (fun x : t => (s x /\ x < n) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    cases (rightmost tr2); simplify; equality.*)
+
+  Admitted.
+  
+    
+ (* Lemma bst_merge_ordered: forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
+                                             bst rt (fun x : t => s x /\ d < x) ->
                              bst (merge_ordered lt rt) (fun x : t => s x /\ x <> d).
   Proof.
     simplify.
-    cases rt; simplify.
+    induct lt; simplify.
     unfold merge_ordered.
-    cases (rightmost lt); simplify.
-    
-    propositional.
-    apply rightmost_member with (s:= (fun x : t => s x  /\ x < d)) in Heq.
-    apply bst_member with (s := (fun x : t => s x /\ x < d)) in Heq.
-    propositional.
+    simplify.
+    apply bst_iff with (fun x : t => s x /\ d < x).
     assumption.
-    assumption.
-
-    apply rightmost_member with (s:= (fun x : t => s x  /\ x < d)) in Heq.
-    apply bst_member with (s := (fun x : t => s x /\ x < d)) in Heq.
+    simplify.
+    assert (~ (s x /\ x < d)).
+    apply H.
     propositional.
     linear_arithmetic.
-    assumption.
-    assumption.
-
-    apply bst_delete_rightmost with (d := n).
-    apply bst_iff with (P := (fun x : t => s x /\ x < d)).
-    assumption.
-    propositional.
-    linear_arithmetic.
-    assert ((s x /\ d < x) -> False).
-    apply H0.
-    propositional.
-    assert (x < d \/ x = d \/ d < x).
+    assert (x < d \/ x = d \/ x > d).  
     apply Nat.lt_total.
     propositional.
+
+    propositional.
+    apply bst_iff with (Q := (fun x : t => (s x /\ d < x) /\ x < d0)) in H4.
+    assert (bst (merge_ordered lt2 rt) (fun x : t => (s x /\ d < x) /\ (x = d0 -> False))).
+    apply IHlt2.
+    assumption.
+    apply bst_iff with (P := (fun x : t => s x /\ d0 < x)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+
+    apply bst_iff with (Q := (fun x : t => (s x /\ x < d) /\ x < d0)) in H1.
+    assert (bst (merge_ordered lt1 Leaf)
+                (fun x : t => (s x /\ x < d) /\ (x = d0 -> False))).
+    apply IHlt1.
+    assumption.
+    unfold bst.
+    propositional.
+    linear_arithmetic.
+    
+
+   (* cases lt2.
+    
+    assert bst (Node d lt1 merge_ordered Leaf
+    
+    rewrite merge_ordered_equiv_leaf in H2.
+    
+
+
+
+
+
+    
+    unfold merge_ordered.
+    simplify.
+    cases (rightmost lt2); simplify.
+    propositional.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    assumption.
     assumption.
 
-    assert (n = d) by equality.
-    subst.
-
-    assert (s x /\ d < x -> False).
-    apply H0.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
     propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
 
+    cases (is_leaf lt2); simplify.
+    apply rightmost_not_leaf in Heq.
     equality.
 
     propositional.
-    Admitted.
-    
-    
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    assumption.
+    assumption.
+
+    apply bst_iff with (P := (fun x : t => (s x /\ x < d0) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    apply rightmost_member with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    linear_arithmetic.
+
+    apply bst_delete_rightmost with (d := n) in H4 as H5.
+    apply bst_iff with (P := (fun x : t => ((s x /\ x < d0) /\ d < x) /\ x < n)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    apply rightmost_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    assumption.
+
+    apply rightmost_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    propositional.
+    Search and.
+
+    apply bst_iff with (P := (fun x : t => s x /\ d0 < x)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    linear_arithmetic.*)
+  *)
+
+  Lemma rightmost_none: forall tr s n, bst tr s -> rightmost tr = Some n -> (forall x, ~ (s x /\ x > n)).
+  Proof.
+    induct tr; simplify.
+    equality.
+    cases (rightmost tr2); simplify.
+    propositional.
+    assert (n0 = n) by equality.
+    subst.
+    apply rightmost_member with (s := (fun x : t => s x /\ d < x)) in Heq.
+    apply bst_member with (s := (fun x : t => s x /\ d < x)) in Heq.
+    apply IHtr2 with (s := (fun x : t => s x /\ d < x)) (n := n) (x := x).
+    assumption.
+    assumption.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+
+    propositional.
+    cases tr2.
+    simplify.
+    assert (n = d) by equality.
+    subst.
+    apply H5 with x.
+    propositional.
+
+    assert (is_leaf (Node d0 tr2_1 tr2_2) = false) by equality.
+    apply rightmost_leaf in Heq.
+    equality.
+  Qed.
   
   Lemma bst_merge_ordered: forall lt rt s d, bst lt (fun x : t => s x /\ x < d) ->
                                              bst rt (fun x : t => s x /\ d < x) ->
@@ -684,19 +965,53 @@ Module Impl.
     assumption.
     assumption.
 
-    apply rightmost_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
-    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq.
+    apply rightmost_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x))
+      in Heq as Heq1.
+    apply bst_member with (s := (fun x : t => (s x /\ x < d0) /\ d < x)) in Heq1.
     propositional.
-    Search and.
 
     apply bst_iff with (P := (fun x : t => s x /\ d0 < x)).
     assumption.
     propositional.
     linear_arithmetic.
     linear_arithmetic.
-    
-Admitted.    
 
+    apply rightmost_none with (s:= (fun x : t => (s x /\ x < d0) /\ d < x)) (x := x) in Heq.
+    propositional.
+    linear_arithmetic.
+    assumption.
+    assumption.
+    assumption.
+
+    propositional.
+    linear_arithmetic.
+    cases (is_leaf lt2); simplify.
+    apply bst_iff with (P := (fun x : t => (s x /\ x < d0) /\ x < d)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    linear_arithmetic.
+
+    apply rightmost_leaf in Heq.
+    equality.
+
+    cases lt2.
+    simplify.
+    propositional.
+    apply bst_iff with (P := (fun x : t => s x /\ d0 < x)).
+    assumption.
+    propositional.
+    linear_arithmetic.
+    linear_arithmetic.
+    assert ((s x /\ x < d0) /\ d < x -> False).
+    apply H4.
+    propositional.
+    linear_arithmetic.
+    apply rightmost_leaf in Heq.
+    assert (is_leaf (Node d1 lt2_1 lt2_2) = false) by equality.
+    equality.
+  Qed.
+  
   (* HINT 2-5 (see Pset4Sig.v) *)
   Lemma bst_delete : forall tr s a, bst tr s ->
     bst (delete a tr) (fun x => s x /\ x <> a).
@@ -719,9 +1034,11 @@ Admitted.
     assumption.
     propositional.
     linear_arithmetic.
+    subst.
 
-    applu
-    apply bst_member with (s := 
+    apply bst_merge_ordered.
+    assumption.
+    assumption.
 
     linear_arithmetic.
 
@@ -734,10 +1051,7 @@ Admitted.
     apply IHtr2 with (a := a) ( s := (fun x : t => s x /\ d < x)).
     assumption.
     propositional.
-
-    
-    
-  Admitted.
+  Qed.
 
   (* Great job! Now you have proven all tree-structure-manipulating operations
      necessary to implement a balanced binary search tree. Rebalancing heuristics
