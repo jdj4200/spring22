@@ -160,6 +160,17 @@ Module Impl.
   | ValuesConst: forall v n1 n2,
       n1 = n2 ->
       values (Const n1) v n2
+  | ValuesVarDefined: forall v x a,
+      v $? x = Some a ->
+      values (Var x) v a
+  | ValuesVarUndefined: forall v x a,
+      v $? x = None ->
+      values (Var x) v a
+  | ValuesPlus: forall v a1 a2 e1 e2 a,
+      values e1 v a1 ->
+      values e2 v a2 ->
+      a = a1 + a2 ->
+      values (Plus e1 e2) v a
   .
 
   (* Note that the following alternative would also work for ValuesConst and
@@ -202,20 +213,40 @@ Module Impl.
     (* Once you define the four constructors for "values", you can uncomment
        the script below. Make sure you understand how it relates to the proof
        tree above! *)
-    (*
+    
     eapply ValuesPlus with (a1 := 2) (a2 := a - 2).
     - eapply ValuesVarDefined. simplify. equality.
     - eapply ValuesVarUndefined. simplify. equality.
     - linear_arithmetic.
-      *)
-  Admitted.
+      
+  Qed.
 
   (* Now, let's prove that "interp" and "values" are equivalent.
      First, [interp -> values]: *)
   Theorem interp_to_values: forall e v a,
       interp e v a -> values e v a.
   Proof.
-  Admitted.
+    induct e; simplify.
+    apply ValuesConst.
+    equality.
+
+    cases (v $? x); simplify.
+    apply ValuesVarDefined.
+    equality.
+    apply ValuesVarUndefined.
+    assumption.
+
+    cases H.
+    cases H.
+    propositional.
+    apply ValuesPlus with (a1 := x) (a2 := x0).
+    apply IHe1.
+    assumption.
+    apply IHe2.
+    assumption.
+    assumption.
+  Qed.
+  
 
   (* To prove the other direction, we have a choice: we can either induct on
      [e] or directly on the proof of [values e v a], because [values] is an
@@ -228,7 +259,14 @@ Module Impl.
   Proof.
     induct 1; (* ← do not change this line *)
       simplify.
-  Admitted.
+    equality.
+    cases (v $? x); simplify; equality.
+    cases (v $? x); simplify; equality.
+
+    apply ex_intro with a1.
+    apply ex_intro with a2.
+    propositional.
+  Qed.
 
   (* Now let's see how things look with an induction on e.  In this simple case,
      it's very similar: *)
@@ -237,7 +275,21 @@ Module Impl.
   Proof.
     induct e; (* ← not the best, but for the sake of the exercise do not change this line *)
       simplify.
-  Admitted.
+    invert H.
+    equality.
+    invert H.
+    cases (v $? x); simplify; equality.
+    cases (v $? x); simplify; equality.
+
+    invert H.
+    apply ex_intro with a1.
+    apply ex_intro with a2.
+    propositional.
+    apply IHe1.
+    assumption.
+    apply IHe2.
+    assumption.
+  Qed.
 
   (* Let's define nondeterministic big-step semantics for evaluating a command.
      Define [eval] as an Inductive Prop such that [eval v1 c v2] means
@@ -248,6 +300,29 @@ Module Impl.
   Inductive eval: valuation -> cmd -> valuation -> Prop :=
   | EvalSkip: forall v,
       eval v Skip v
+  | EvalAssign: forall v x e ret,
+      interp e v ret ->
+      eval v (Assign x e) (v $+ (x, ret))
+  | EvalSeq: forall v c1 v1 c2 v2,
+      eval v c1 v1 ->
+      eval v1 c2 v2 ->
+      eval v (Sequence c1 c2) v2
+  | EvalIfTrue : forall v e then_ else_ v',
+      ~(interp e v 0) ->
+      eval v then_ v' ->
+      eval v (If e then_ else_) v'
+  | EvalIfFalse : forall v e then_ else_ v',
+      interp e v 0 ->
+      eval v else_ v' ->
+      eval v (If e then_ else_) v'
+  | EvalWhileTrue : forall v e body v' v'',
+      ~(interp e v 0) ->
+      eval v body v' ->
+      eval v' (While e body) v'' ->
+      eval v (While e body) v''
+  | EvalWhileFalse : forall v e body,
+      interp e v 0 ->
+      eval v (While e body) v
   .
 
   (* Hint: Many of the proofs below will depend on definitions we ask you to
@@ -275,7 +350,9 @@ Module Impl.
   Lemma read_last_value: forall x v c n,
       values (Var x) (v $+ (x, c)) n -> n = c.
   Proof.
-  Admitted.
+    simplify.
+    invert H; simplify; equality.
+  Qed.
 
   (* Hint: This next theorem is a bit boring -- it's about 30 lines of "invert",
      "simplify", "discriminate", "equality", "linear_arithmetic" and
