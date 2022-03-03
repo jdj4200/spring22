@@ -301,27 +301,29 @@ Module Impl.
   | EvalSkip: forall v,
       eval v Skip v
   | EvalAssign: forall v x e ret,
-      interp e v ret ->
+      values e v ret ->
       eval v (Assign x e) (v $+ (x, ret))
   | EvalSeq: forall v c1 v1 c2 v2,
       eval v c1 v1 ->
       eval v1 c2 v2 ->
       eval v (Sequence c1 c2) v2
-  | EvalIfTrue : forall v e then_ else_ v',
-      ~(interp e v 0) ->
+  | EvalIfTrue : forall v e then_ else_ v' ret,
+      ret > 0 ->
+      values e v ret ->
       eval v then_ v' ->
       eval v (If e then_ else_) v'
   | EvalIfFalse : forall v e then_ else_ v',
-      interp e v 0 ->
+      values e v 0 ->
       eval v else_ v' ->
       eval v (If e then_ else_) v'
-  | EvalWhileTrue : forall v e body v' v'',
-      ~(interp e v 0) ->
+  | EvalWhileTrue : forall v e body v' v'' ret,
+      ret > 0 ->
+      values e v ret ->
       eval v body v' ->
       eval v' (While e body) v'' ->
       eval v (While e body) v''
   | EvalWhileFalse : forall v e body,
-      interp e v 0 ->
+      values e v 0 ->
       eval v (While e body) v
   .
 
@@ -367,8 +369,69 @@ Module Impl.
   Theorem the_answer_is_indeed_42:
     forall v, eval $0 the_answer_is_42 v -> v $? "answer" = Some 42.
   Proof.
-  Admitted.
+    simplify.
+    invert H.
+    invert H5.
+    invert H2.
+    invert H6.
+    invert H11.
+    invert H6.
+    simplify.
+    equality.
 
+    invert H7.
+    invert H9.
+    invert H6.
+    simplify.
+    invert H2.
+    invert H4.
+    assert (a1 = a2) by equality.
+    propositional.
+    invert H8.
+    assert (ret = a2) by equality.
+    assert (a2 + a2 = 0) by equality.
+    apply plus_is_O in H4.
+    propositional.
+    subst.
+    linear_arithmetic.
+    
+    equality.
+    equality.
+    invert H4.
+    equality.
+    invert H3.
+    invert H8.
+    simplify.
+    equality.
+    simplify.
+    equality.
+    
+    invert H9.
+    invert H10.
+    invert H7.
+    simplify.
+    equality.
+
+    invert H3.
+    invert H6.
+    invert H10.
+    invert H5.
+    simplify.
+    equality.
+
+    apply read_last_value in H7.
+    invert H8.
+    invert H9.
+    simplify.
+    invert H3.
+    invert H5.
+    simplify.
+    equality.
+    simplify.
+    equality.   
+  Qed.
+  
+  
   (* Here's another example program. If we run it on a valuation that is
      undefined for "x", it will read the undefined variable "x" to decide
      whether to abort the loop, so any number of loop iterations is possible. *)
@@ -383,7 +446,39 @@ Module Impl.
   Proof.
     unfold loop_of_unknown_length.
     induct n; simplify.
-  Admitted.
+
+    replace (initialCounter + 0) with initialCounter by linear_arithmetic.
+    apply EvalWhileFalse.
+    apply ValuesVarUndefined.
+    simplify.
+    equality.
+    
+    specialize (IHn (initialCounter + 1)).
+    (*invert IHn.*)
+    apply EvalWhileTrue with (v' := ($0 $+ ("counter", initialCounter + 1)))
+                             (ret := 1).
+    linear_arithmetic.
+    apply ValuesVarUndefined.
+    simplify.
+    equality.
+
+    replace ($0 $+ ("counter", initialCounter + 1)) with
+            (($0 $+ ("counter", initialCounter) $+ ("counter", initialCounter + 1)))
+      by maps_equal.
+    apply EvalAssign with (v := ($0 $+ ("counter", initialCounter))).
+    apply ValuesPlus with (a1 := initialCounter) (a2 := 1).
+    constructor.
+    simplify.
+    equality.
+
+    constructor.
+    equality.
+
+    equality.
+
+    replace (initialCounter + S n) with (initialCounter + 1 + n) by linear_arithmetic.
+    assumption.
+  Qed.
 
   (* Wherever this TODO_FILL_IN is used, you should replace it with your own code *)
   Axiom TODO_FILL_IN: Prop.
