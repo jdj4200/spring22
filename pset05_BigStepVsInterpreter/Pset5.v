@@ -263,8 +263,8 @@ Module Impl.
     cases (v $? x); simplify; equality.
     cases (v $? x); simplify; equality.
 
-    apply ex_intro with a1.
-    apply ex_intro with a2.
+    exists a1.
+    exists a2.
     propositional.
   Qed.
 
@@ -282,13 +282,9 @@ Module Impl.
     cases (v $? x); simplify; equality.
 
     invert H.
-    apply ex_intro with a1.
-    apply ex_intro with a2.
-    propositional.
-    apply IHe1.
-    assumption.
-    apply IHe2.
-    assumption.
+    exists a1.
+    exists a2.
+    eauto.
   Qed.
 
   (* Let's define nondeterministic big-step semantics for evaluating a command.
@@ -613,7 +609,6 @@ Module Impl.
   Ltac solve_run :=
     repeat match goal with
            | [ H: ?a |- ?a] => assumption
-           | [ H : ?v1 = ?v2 |- _] => subst
            | [ H : S ?fuel1 <= S ?fuel2 |- _] => apply le_S_n in H
            | [ H : exists _, _ |- _] => cases H
            | [ H : _ /\ _ |- _] => propositional
@@ -636,16 +631,7 @@ Module Impl.
     cases fuel2; simplify.
     linear_arithmetic.
 
-    cases c; simplify; solve_run.
-    apply IHfuel1.
-    assumption.
-    apply H1.
-    apply IHfuel1.
-    assumption.
-    apply H2.
-    eauto 6.
-    eauto 6.
-    eauto 9.
+    cases c; simplify; solve_run; eauto 9.
   Qed.
   
 
