@@ -481,7 +481,7 @@ Module Impl.
   Qed.
 
   (* Wherever this TODO_FILL_IN is used, you should replace it with your own code *)
-  Axiom TODO_FILL_IN: Prop.
+  (*Axiom TODO_FILL_IN: Prop.*)
 
   (** * Part 3: Fixpoints with fuel **)
 
@@ -513,7 +513,8 @@ Module Impl.
         (exists r, interp e v1 r /\ r <> 0 /\ run fuel' v1 c1 v2) \/
         (interp e v1 0 /\ run fuel' v1 c2 v2)
       | While e c1 =>
-        TODO_FILL_IN
+        (exists r v', interp e v1 r /\ r <> 0 /\ run fuel' v1 c1 v' /\ run fuel' v' c v2) \/
+        (interp e v1 0 /\ v1 = v2)
       end
     end.
 
@@ -525,7 +526,64 @@ Module Impl.
       run fuel v1 c v2 ->
       eval v1 c v2.
   Proof.
-  Admitted.
+    induct fuel; simplify.
+    equality.
+
+    cases c; simplify.
+    subst.
+    apply EvalSkip.
+
+    cases H.
+    propositional.
+    subst.
+    apply EvalAssign.
+    apply interp_to_values.
+    assumption.
+
+    cases H.
+    propositional.
+    apply IHfuel in H0.
+    apply IHfuel in H1.
+    apply EvalSeq with x.
+    assumption.
+    assumption.
+
+    cases H.
+    cases H.
+    propositional.
+    apply interp_to_values in H0.
+    apply IHfuel in H2.
+    apply EvalIfTrue with x.
+    linear_arithmetic.
+    assumption.
+    assumption.
+
+    propositional.
+    apply interp_to_values in H0.
+    apply IHfuel in H1.
+    apply EvalIfFalse.
+    assumption.
+    assumption.
+
+    cases H.
+    cases H.
+    cases H.
+    propositional.
+    apply interp_to_values in H0.
+    apply IHfuel in H1.
+    apply IHfuel in H3.
+    apply EvalWhileTrue with (v' := x0) (ret := x).
+    linear_arithmetic.
+    assumption.
+    assumption.
+    assumption.
+
+    propositional.
+    subst.
+    apply EvalWhileFalse.
+    apply interp_to_values in H0.
+    assumption.
+  Qed.
 
   (* To prove the other direction, we will need the following lemma, which shows
      that excess fuel isn't an issue.
@@ -547,12 +605,49 @@ Module Impl.
      way here would be to use the lemma "le_S_n" to turn "S fuel1 <= S fuel2"
      into "fuel1 <= fuel2", which will be needed for the IH. *)
 
+  Lemma le_S_n: forall n m, S n <= S m -> n <= m.
+  Proof.
+    linear_arithmetic.
+  Qed.
+
+  Ltac solve_run :=
+    repeat match goal with
+           | [ H: ?a |- ?a] => assumption
+           | [ H : ?v1 = ?v2 |- _] => subst
+           | [ H : S ?fuel1 <= S ?fuel2 |- _] => apply le_S_n in H
+           | [ H : exists _, _ |- _] => cases H
+           | [ H : _ /\ _ |- _] => propositional
+           | [ H : _ \/ _ |- _] => propositional
+           | [ |- exists _, _] => econstructor
+           | [ |- _ /\ _] => propositional
+           | [ |- _ \/ _] => propositional
+           end; simplify; try equality.
+
+  (*Local Hint Resolve le_S_n : core.*)
+  
   Lemma run_monotone: forall fuel1 fuel2 v1 c v2,
       fuel1 <= fuel2 ->
       run fuel1 v1 c v2 ->
       run fuel2 v1 c v2.
   Proof.
-  Admitted.
+    induct fuel1; simplify.
+    equality.
+
+    cases fuel2; simplify.
+    linear_arithmetic.
+
+    cases c; simplify; solve_run.
+    apply IHfuel1.
+    assumption.
+    apply H1.
+    apply IHfuel1.
+    assumption.
+    apply H2.
+    eauto 6.
+    eauto 6.
+    eauto 9.
+  Qed.
+  
 
   (* For the other direction, we could naively start proving it like this: *)
   Theorem eval_to_run: forall v1 c v2,
@@ -585,7 +680,13 @@ Module Impl.
       wrun v Skip v.
   Lemma WRunSkip: WRunSkip_statement.
   Proof.
-  Admitted.
+    unfold WRunSkip_statement.
+    simplify.
+    unfold wrun.
+    exists 1.
+    simplify.
+    equality.
+  Qed.
 
   Definition WRunAssign_statement : Prop :=
     forall v x e a,
@@ -593,8 +694,23 @@ Module Impl.
       wrun v (Assign x e) (v $+ (x, a)).
   Lemma WRunAssign: WRunAssign_statement.
   Proof.
-  Admitted.
+    unfold WRunAssign_statement.
+    simplify.
+    unfold wrun.
+    exists 1.
+    simplify.
+    exists a.
+    propositional.
+  Qed.
 
+  Lemma fuel_ne0: forall fuel v1 c v2, run fuel v1 c v2 -> fuel > 0.
+  Proof.
+    simplify.
+    cases fuel; simplify.
+    equality.
+    linear_arithmetic.
+  Qed.
+ 
   Definition WRunSeq_statement : Prop :=
     forall v c1 v1 c2 v2,
       wrun v c1 v1 ->
@@ -602,39 +718,158 @@ Module Impl.
       wrun v (Sequence c1 c2) v2.
   Lemma WRunSeq: WRunSeq_statement.
   Proof.
-  Admitted.
+    unfold WRunSeq_statement.
+    simplify.
+    unfold wrun in *.
+    cases H.
+    cases H0.
+    apply fuel_ne0 in H as H1.
+    apply fuel_ne0 in H0 as H2.
+    assert (x < x0 \/ x = x0 \/ x > x0).
+    apply Nat.lt_total.
+    cases H3.
+    
+    exists (S x0).
+    apply run_monotone with (fuel2 := x0) in H.
+    simplify.
+    eauto.
+    linear_arithmetic.
+
+    subst.
+    exists (S x0).
+    simplify.
+    eauto.
+
+    exists (S x).
+    apply run_monotone with (fuel2 := x) in H0.
+    simplify.
+    eauto.
+    linear_arithmetic.
+  Qed.
 
   (* For the next few lemmas, we've left you the job of stating the theorem as
      well as proving it. *)
 
-  Definition WRunIfTrue_statement : Prop. Admitted.
+  Definition WRunIfTrue_statement : Prop :=
+    forall v v1 c1 c2 e a,
+      a <> 0 ->
+      interp e v a ->
+      wrun v c1 v1 ->
+      wrun v (If e c1 c2) v1.
   Lemma WRunIfTrue: WRunIfTrue_statement.
   Proof.
-  Admitted.
+    unfold WRunIfTrue_statement.
+    simplify.
+    unfold wrun in *.
+    cases H1.
+    exists (S x).
+    simplify.
+    left.
+    exists a.
+    propositional.
+  Qed.
 
-  Definition WRunIfFalse_statement : Prop. Admitted.
+  Definition WRunIfFalse_statement : Prop :=
+    forall v v1 c1 c2 e,
+      interp e v 0 ->
+      wrun v c2 v1 ->
+      wrun v (If e c1 c2) v1.
   Lemma WRunIfFalse: WRunIfFalse_statement.
   Proof.
-  Admitted.
+    unfold WRunIfFalse_statement.
+    simplify.
+    unfold wrun in *.
+    cases H0.
+    exists (S x).
+    simplify.
+    eauto.
+  Qed.
 
-  Definition WRunWhileTrue_statement : Prop. Admitted.
+  Definition WRunWhileTrue_statement : Prop :=
+    forall v v1 v2 c1 e a,
+      a <> 0 ->
+      interp e v a ->
+      wrun v c1 v1 ->
+      wrun v1 (While e c1) v2 ->
+      wrun v (While e c1) v2.
   Lemma WRunWhileTrue: WRunWhileTrue_statement.
   Proof.
-  Admitted.
+    unfold WRunWhileTrue_statement.
+    simplify.
+    unfold wrun in *.
+    cases H1.
+    cases H2.
+    apply fuel_ne0 in H1 as H3.
+    apply fuel_ne0 in H2 as H4.
+    assert (x < x0 \/ x = x0 \/ x > x0).
+    apply Nat.lt_total.
+    cases H5.
+    
+    exists (S x0).
+    apply run_monotone with (fuel2 := x0) in H1.
+    simplify.
+    eauto 7.
+    linear_arithmetic.
 
-  Definition WRunWhileFalse_statement : Prop. Admitted.
+    subst.
+    exists (S x0).
+    simplify.
+    eauto 7.
+
+    exists (S x).
+    apply run_monotone with (fuel2 := x) in H2.
+    simplify.
+    eauto 7.
+    linear_arithmetic.
+  Qed.
+  
+  Definition WRunWhileFalse_statement : Prop :=
+    forall v c1 e,
+      interp e v 0 ->
+      wrun v (While e c1) v.
   Lemma WRunWhileFalse: WRunWhileFalse_statement.
   Proof.
-  Admitted.
-
+    unfold WRunWhileFalse_statement.
+    simplify.
+    unfold wrun in *.
+    exists 1.
+    simplify.
+    eauto.
+  Qed.
+  
   (* Now, thanks to these helper lemmas, proving the direction from eval to wrun
      becomes easy: *)
   Theorem eval_to_wrun: forall v1 c v2,
       eval v1 c v2 ->
       wrun v1 c v2.
   Proof.
-  Admitted.
-
+    induct 1; simplify.
+    apply WRunSkip.
+    apply WRunAssign.
+    apply values_to_interp.
+    assumption.
+    eapply WRunSeq; eauto.
+    eapply WRunIfTrue.
+    assert (ret <> 0) by linear_arithmetic.
+    apply H2.
+    apply values_to_interp.
+    assumption.
+    assumption.
+    eapply WRunIfFalse; eauto.
+    apply values_to_interp.
+    assumption.
+    eapply WRunWhileTrue.
+    assert (ret <> 0) by linear_arithmetic.
+    apply H3.
+    apply values_to_interp.
+    assumption.
+    apply IHeval1.
+    assumption.
+    eapply WRunWhileFalse; eauto.
+    apply values_to_interp.
+    assumption.
+  Qed.
+  
   (* Remember when we said earlier that [induct 1] does induction on the proof
      of [eval], whereas [induct c] does induction on the program itself?  Try
      proving the above with [induct c] instead of [induct 1], skipping straight
