@@ -699,16 +699,7 @@ Module Impl.
     unfold wrun.
     exists 1.
     simplify.
-    exists a.
-    propositional.
-  Qed.
-
-  Lemma fuel_ne0: forall fuel v1 c v2, run fuel v1 c v2 -> fuel > 0.
-  Proof.
-    simplify.
-    cases fuel; simplify.
-    equality.
-    linear_arithmetic.
+    eauto.
   Qed.
  
   Definition WRunSeq_statement : Prop :=
@@ -723,27 +714,12 @@ Module Impl.
     unfold wrun in *.
     cases H.
     cases H0.
-    apply fuel_ne0 in H as H1.
-    apply fuel_ne0 in H0 as H2.
-    assert (x < x0 \/ x = x0 \/ x > x0).
-    apply Nat.lt_total.
-    cases H3.
-    
-    exists (S x0).
-    apply run_monotone with (fuel2 := x0) in H.
+    exists (S (x + x0)).
+    apply run_monotone with (fuel2 := (x + x0)) in H.
+    apply run_monotone with (fuel2 := (x + x0)) in H0.
     simplify.
     eauto.
     linear_arithmetic.
-
-    subst.
-    exists (S x0).
-    simplify.
-    eauto.
-
-    exists (S x).
-    apply run_monotone with (fuel2 := x) in H0.
-    simplify.
-    eauto.
     linear_arithmetic.
   Qed.
 
@@ -764,9 +740,7 @@ Module Impl.
     cases H1.
     exists (S x).
     simplify.
-    left.
-    exists a.
-    propositional.
+    eauto 7.
   Qed.
 
   Definition WRunIfFalse_statement : Prop :=
@@ -799,27 +773,12 @@ Module Impl.
     unfold wrun in *.
     cases H1.
     cases H2.
-    apply fuel_ne0 in H1 as H3.
-    apply fuel_ne0 in H2 as H4.
-    assert (x < x0 \/ x = x0 \/ x > x0).
-    apply Nat.lt_total.
-    cases H5.
-    
-    exists (S x0).
-    apply run_monotone with (fuel2 := x0) in H1.
+    exists (S (x + x0)).
+    apply run_monotone with (fuel2 := (x + x0)) in H1.
+    apply run_monotone with (fuel2 := (x + x0)) in H2.
     simplify.
     eauto 7.
     linear_arithmetic.
-
-    subst.
-    exists (S x0).
-    simplify.
-    eauto 7.
-
-    exists (S x).
-    apply run_monotone with (fuel2 := x) in H2.
-    simplify.
-    eauto 7.
     linear_arithmetic.
   Qed.
   
