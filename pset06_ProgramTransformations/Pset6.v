@@ -359,6 +359,50 @@ Inductive eval (phi: environment): valuation -> cmd -> valuation -> Prop :=
 As a sanity check, we can prove that the semantics is deterministic:
 |*)
 
+Lemma eval_deterministic' :
+  forall phi c v0 v1,
+    eval phi v0 c v1 ->
+    (forall v2, eval phi v0 c v2 ->
+    v1 = v2).
+Proof.
+  induct 1; simplify.
+  invert H.
+  equality.
+  
+  invert H0.
+  equality.
+
+  invert H4.
+  assert (body0 = body) by equality.
+  assert (x3 = x1) by equality.
+  assert (x4 = x2) by equality.
+  assert (y0 = y) by equality.
+  subst.
+  clear H9.
+  assert (v' = v'0); eauto. equality.
+
+  invert H1.
+  assert (v1 = v4); eauto.
+  apply IHeval2.
+  subst.
+  assumption.
+
+  invert H2.
+  eauto.
+  equality.
+
+  invert H1.
+  equality.
+  eauto.
+
+  invert H3.
+  assert (v' = v'0); eauto.
+  subst.
+  eauto.
+  equality.
+
+  invert H0; equality.
+Qed.
 
 Lemma eval_deterministic :
   forall phi c v0 v1 v2,
@@ -366,7 +410,11 @@ Lemma eval_deterministic :
     eval phi v0 c v2 ->
     v1 = v2.
 Proof.
-Admitted.
+  simplify.
+  apply eval_deterministic' with (phi := phi) (c := c) (v0 := v0).
+  assumption.
+  assumption.
+Qed.
 
 (*|
 Now let's check that our semantics compute the right values.  The `eval_intro`
@@ -550,20 +598,65 @@ Note that your optimization function should *not* be recursive!  We will
 implement repeated rule application later on top of your function.
 |*)
 
-Definition opt_binop_fold (b: BinopName) (e1 e2: expr) : expr.
-Admitted.
+Definition opt_binop_fold (b: BinopName) (e1 e2: expr) : expr :=
+  match b with
+  | Plus => match e2 with
+            | 0 => e1
+            | _ => (Binop b e1 e2)
+           end
+  | Times => match e2 with
+            | 0 => 0
+            | _ => (Binop b e1 e2)
+            end 
+  | Divide => match e2 with
+            | 1 => e1
+            | _ => (Binop b e1 e2)
+            end
+  | _ => Binop b e1 e2
+  end.
+
 Arguments opt_binop_fold !_ !_ !_ /. (* Coq magic *)
 
 Example opt_binop_fold_test1 :
   opt_binop_fold Plus "x" 0 = "x".
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
 
 Lemma opt_binop_fold_sound : forall b e1 e2 v,
     interp_arith (opt_binop_fold b e1 e2) v =
     interp_binop b (interp_arith e1 v) (interp_arith e2 v).
 Proof.
-Admitted.
+  simplify.
+  cases b; simplify; try equality.
+  unfold opt_binop_fold.
+  cases e2; simplify.
+  cases n; simplify.
+  linear_arithmetic.
+  equality.
+  equality.
+  equality.
+
+  unfold opt_binop_fold.
+  cases e2; simplify.
+  cases n; simplify.
+  equality.
+  cases n; simplify.
+  rewrite Nat.div_1_r.
+  equality.
+  equality.
+  equality.
+  equality.
+
+  unfold opt_binop_fold.
+  cases e2; simplify.
+  cases n; simplify.
+  linear_arithmetic.
+  equality.
+  equality.
+  equality.
+Qed.
 
 (*|
 Precomputation
@@ -579,15 +672,38 @@ Note that your optimization function should *not* be recursive!  We will
 implement repeated rule application later on top of your function.
 |*)
 
-Definition opt_binop_precompute (b: BinopName) (e1 e2: expr) : expr.
-Admitted.
+Definition interp_binop_def (b: BinopName) (n1 n2: nat) :=
+  match b with
+  | LogAnd => Nat.land n1 n2
+  | Eq => if (n1 ==n n2) then 1 else 0
+  | Plus => n1 + n2
+  | Minus => n1 - n2
+  | Times => n1 * n2
+  | Divide => n1 / n2
+  | ShiftLeft => Nat.shiftl n1 n2
+  | ShiftRight => Nat.shiftr n1 n2
+  | Modulo => Nat.modulo n1 n2
+  end.
+
+Definition opt_binop_precompute (b: BinopName) (e1 e2: expr) : expr :=
+  match e1 with
+  | Const n =>
+      match e2 with
+      | Const m => Const (interp_binop_def b n m)
+      | _ => Binop b e1 e2
+      end
+  | _ => Binop b e1 e2
+  end.
 Arguments opt_binop_precompute !_ !_ !_ /. (* Coq magic *)
 
 Lemma opt_binop_precompute_sound : forall b e1 e2 v,
     interp_arith (opt_binop_precompute b e1 e2) v =
     interp_binop b (interp_arith e1 v) (interp_arith e2 v).
 Proof.
-Admitted.
+  simplify.
+  unfold opt_binop_precompute.
+  cases b; cases e1; cases e2; simplify; try equality.
+Qed.
 
 (*|
 Optimizing power-of-2 operations
@@ -735,27 +851,44 @@ applies all optimizations that you implemented and proved (at least
 Mind the order in which the optimizations are applied!
 |*)
 
-Definition opt_arith (e: expr) : expr.
-Admitted.
+Fixpoint opt_arith' (e: expr) : expr :=
+  match e with
+  | Binop b e1 e2 =>
+      match (opt_binop_precompute b (opt_arith' e1) (opt_arith' e2)) with
+      | Binop b' e1' e2' => opt_binop_fold b' e1' e2'
+      | Const n => Const n
+      | Var x => Var x
+      end
+  | _ => e
+  end.
+
+Definition opt_arith (e: expr) : expr := opt_arith' e.
+
 Arguments opt_arith !e /. (* Coq magic *)
 
 Example opt_arith_fold_test1 :
   opt_arith (1 + "z" * ("y" * ("x" * (0 + 0 / 1))))%expr =
   (1)%expr.
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
 
 Example opt_arith_precompute_test1:
   opt_arith (("x" + (3 - 3)) / (0 + 1) + ("y" + "y" * 0))%expr =
   ("x" + "y")%expr.
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
+
 
 Example opt_arith_precompute_test2 :
   opt_arith ((("y" / ("x" * 0 + 7 / 1)) mod (12 - 5)) / (2 * 3))%expr =
   (("y" / 7) mod 7 / 6)%expr.
 Proof.
-Admitted.
+  simplify. equality.
+Qed.
 
 Example opt_arith_log2_test1 :
   opt_arith (("y" * 8) mod 8 / 4)%expr =
@@ -781,12 +914,109 @@ Example opt_arith_bitwise_test2 :
 Proof.
 Admitted.
 
-
 Lemma opt_arith_sound : forall e v,
     interp_arith (opt_arith e) v =
     interp_arith e v.
 Proof.
-Admitted.
+  induct e; simplify; try equality.
+  cases (opt_arith e1); simplify; specialize (IHe1 v); subst.
+  cases (opt_arith e2); simplify; specialize (IHe2 v); subst.
+  cases b; simplify; equality.
+  cases b; simplify; eauto.
+  cases (interp_arith e1 v ==n interp_arith e2 v);
+  cases (interp_arith e1 v ==n match v $? x with
+                            | Some a => a
+                            | None => 0
+                               end); equality.
+  
+  cases b; simplify; eauto.
+  cases (interp_arith e1 v ==n interp_binop b0 (interp_arith e3 v) (interp_arith e4 v));
+    cases (interp_arith e1 v ==n interp_arith e2 v); equality.
+
+  cases b; simplify; eauto.
+  cases (match v $? x with
+      | Some a => a
+      | None => 0
+         end ==n interp_arith (opt_arith e2) v);
+    cases (interp_arith e1 v ==n interp_arith e2 v); equality.
+  unfold opt_binop_fold.
+  cases (opt_arith e2).
+  cases n; simplify.
+  specialize (IHe2 v).
+  replace (interp_arith e2 v) with 0 by equality.
+  linear_arithmetic.
+  specialize (IHe2 v).
+  equality.
+  specialize (IHe2 v).
+  simplify.
+  equality.
+  simplify.
+  equality.
+
+  cases (opt_arith e2); simplify.
+  cases n; simplify.
+  equality.
+  cases n; simplify.
+  replace (interp_arith e2 v) with 1 by equality.
+  rewrite IHe1.
+  assert (interp_arith e1 v / 1 = interp_arith e1 v).
+  apply Nat.div_1_r.
+  equality.
+
+  equality.
+  eauto.
+  eauto.
+
+  cases (opt_arith e2); simplify.
+  cases n; simplify.
+  rewrite IHe1.
+  replace (interp_arith e2 v) with 0 by equality.
+  linear_arithmetic.
+  eauto.
+  eauto.
+  eauto.
+
+  cases b; simplify; eauto.
+
+  cases (interp_binop b0 (interp_arith e3 v) (interp_arith e4 v) ==n
+                                                                     interp_arith (opt_arith e2) v);
+    cases (interp_arith e1 v ==n interp_arith e2 v); equality.
+
+  cases (opt_arith e2).
+  cases n; simplify.
+  specialize (IHe2 v).
+  replace (interp_arith e2 v) with 0 by equality.
+  linear_arithmetic.
+  specialize (IHe2 v).
+  equality.
+  specialize (IHe2 v).
+  simplify.
+  equality.
+  simplify.
+  equality.
+
+  cases (opt_arith e2); simplify.
+  cases n; simplify.
+  equality.
+  cases n; simplify.
+  replace (interp_arith e2 v) with 1 by equality.
+  rewrite IHe1.
+  assert (interp_arith e1 v / 1 = interp_arith e1 v).
+  apply Nat.div_1_r.
+  equality.
+  equality.
+  eauto.
+  eauto.
+
+  cases (opt_arith e2); simplify.
+  cases n; simplify.
+  rewrite IHe1.
+  replace (interp_arith e2 v) with 0 by equality.
+  linear_arithmetic.
+  eauto.
+  eauto.
+  eauto.
+Qed.
 
 (*|
 Optional: cost modeling
@@ -835,21 +1065,36 @@ which we remove instances of `Skip`.  The following helper function might be use
 Definition is_skip (c: cmd) : sumbool (c = Skip) (c <> Skip) :=
   ltac:(cases c; econstructor; equality).
 
-Fixpoint opt_unskip (c: cmd) : cmd.
-Admitted.
+Fixpoint opt_unskip (c: cmd) : cmd :=
+  match c with
+  | Sequence c1 c2 =>
+      match Sequence (opt_unskip c1) (opt_unskip c2) with
+      | Sequence Skip Skip => Skip
+      | Sequence c1' Skip => c1'
+      | Sequence Skip c2' => c2'
+      | c' => c'
+      end
+  | If e thn els => If e (opt_unskip thn) (opt_unskip els)
+  | While e body => While e (opt_unskip body)
+  | c => c
+  end.
 
 Example opt_unskip_test1 :
   opt_unskip (Skip;; (Skip;; Skip);; (Skip;; Skip;; Skip)) =
   Skip.
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
+
 
 Example opt_unskip_test2 :
   opt_unskip (when 0 then (Skip;; Skip) else Skip done;;
               while 0 loop Skip;; Skip done;; Skip) =
   (when 0 then Skip else Skip done;; while 0 loop Skip done).
 Proof.
-Admitted.
+  simplify. equality.
+Qed.
 
 (*|
 Now let's prove this optimization correct.  The following two lemmas and the
@@ -903,7 +1148,11 @@ Lemma opt_unskip_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_unskip c) v'.
 Proof.
-Admitted.
+  induct 1; simplify; try eval_intro; eauto.
+
+  cases (opt_unskip c1); cases (opt_unskip c2); simplify; eval_elim; eauto;
+    econstructor; eauto; econstructor; eauto.
+  Qed.
 
 (*|
 Constant propagation
@@ -928,8 +1177,15 @@ Since there are no assignments in expressions, this is just a matter of
 substituting known values recursively:
 |*)
 
-Fixpoint opt_arith_constprop (c: expr) (consts: valuation) {struct c} : expr.
-Admitted.
+Fixpoint opt_arith_constprop (c: expr) (consts: valuation) {struct c} : expr :=
+  match c with
+  | Const n => Const n
+  | Var x => match consts $? x with
+             | Some a => Const a
+             | None => Var x
+             end
+  | Binop b e1 e2 => Binop b (opt_arith_constprop e1 consts) (opt_arith_constprop e2 consts)
+  end.
 
 (*|
 What is the correctness criterion for constant propagation?  The environment of
@@ -945,7 +1201,14 @@ Lemma opt_arith_constprop_sound : forall e v consts,
     interp_arith (opt_arith_constprop e consts) v =
     interp_arith e v.
 Proof.
-Admitted.
+  induct e; simplify.
+  equality.
+  cases (consts $? x); simplify.
+  cases (v $? x); simplify; assert (v $? x = Some n);
+    try apply includes_lookup with consts; eauto; equality.
+  equality.
+  eauto.
+Qed.
 
 (*|
 We can now define constant propagation on commands.  Propagating constants
@@ -972,15 +1235,64 @@ the assignment entirely — can you see why?
 |*)
 
 
-(* HINT 1-2 (see Pset6Sig.v) *) 
-Definition opt_constprop (c: cmd) : cmd.
-Admitted.
+(* HINT 1-2 (see Pset6Sig.v) *)
+Fixpoint opt_constprop' (c: cmd) (consts : valuation) : cmd * valuation :=
+  match c with
+  | Skip => (Skip, consts)
+  | Assign x e =>
+      match (opt_arith_constprop e consts) with
+      | Const n => ((Assign x (Const n)), (consts $+ (x, n)))
+      | e' => ((Assign x e'), (consts $- x))
+      end
+  | AssignCall x f e1 e2 => ((AssignCall x f e1 e2), consts $- x)
+  | Sequence c1 c2 =>
+      let (c1', consts') := (opt_constprop' c1 consts) in
+           let (c2', consts'') := (opt_constprop' c2 consts') in 
+                  ((Sequence c1' c2'), consts'')
+  | If e thn els => let e' := (opt_arith_constprop e consts) in
+                    (If e' (fst (opt_constprop' thn consts))
+                        (fst (opt_constprop' els consts)), $0)
+  | While e body => (While e (fst (opt_constprop' body $0)), $0)
+  end.
+
+Fixpoint opt_constprop_consts (c: cmd) (consts : valuation) : valuation :=
+  match c with
+  | Skip => consts
+  | Assign x e =>
+      match (opt_arith_constprop e consts) with
+      | Const n => consts $+ (x, n)
+      | _ => consts $- x
+      end
+  | AssignCall x _ _ _ => consts $- x
+  | Sequence c1 c2 => opt_constprop_consts c2 ((opt_constprop_consts c1 consts))
+  | _ => $0
+  end.
+
+Fixpoint opt_constprop2 (c: cmd) (consts : valuation) : cmd :=
+  match c with
+  | Assign x e =>
+      match (opt_arith_constprop e consts) with
+      | Const n => Assign x (Const n)
+      | e' => Assign x e'
+      end
+  | Sequence c1 c2 =>
+      Sequence (opt_constprop2 c1 consts) (opt_constprop2 c2 (opt_constprop_consts c1 consts))
+  | If e thn els => If (opt_arith_constprop e consts)
+                       (opt_constprop2 thn consts) (opt_constprop2 els consts)
+  | While e body => (While e (opt_constprop2 body $0))
+  | c' => c'
+  end.
+
+Definition opt_constprop (c: cmd) : cmd := fst (opt_constprop' c $0).
+
 Arguments opt_constprop !_ /. (* Coq magic *)
 
 Example opt_constprop_test1 :
   opt_constprop FactBody = FactBody.
 Proof.
-Admitted.
+  simplify.
+  equality.
+Qed.
 
 Example opt_constprop_test2 :
   opt_constprop ("x" <- 7;; "y" <- "x";;
@@ -998,13 +1310,43 @@ Example opt_constprop_test2 :
   done;;
   "r" <- "z").
 Proof.
-Admitted.
-
+  simplify.
+  equality.
+Qed.
 
 Lemma opt_constprop_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_constprop c) v'.
 Proof.
+  induct 1; simplify; try eval_intro; eauto.
+  cases (opt_arith_constprop e $0); simplify;
+    eval_intro; rewrite <- Heq; rewrite <- H; apply opt_arith_constprop_sound; apply empty_includes.
+
+  cases c1; simplify; eauto.
+  cases (opt_arith_constprop e $0); simplify.
+  invert IHeval1.
+  simplify.
+  invert IHeval2; simplify.
+  cases c2; simplify; try equality.
+  cases (opt_arith_constprop e0 $0); simplify; equality.
+  
+  cases c2; simplify; try equality.
+  cases e1; simplify.
+  eauto.
+
+  cases (($0 $+ (x, n)) $? x2); simplify.
+  (*invert H.
+  Search (_ $+(_ , _)).
+  assert ((interp_arith e v) = n).
+  subst.
+  simplify.*)
+  assert (e0 = Var x2) by equality.
+  subst.
+  Search (_ $+ (_,  _)).
+  Search ($0).
+  simplify.
+  cases (($0 $+ (x, n)) $? x2); simplify.
+  Search (_ $? _).
 Admitted.
 
 (*|
