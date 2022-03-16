@@ -1244,7 +1244,8 @@ Fixpoint opt_constprop' (c: cmd) (consts : valuation) : cmd * valuation :=
       | Const n => ((Assign x (Const n)), (consts $+ (x, n)))
       | e' => ((Assign x e'), (consts $- x))
       end
-  | AssignCall x f e1 e2 => ((AssignCall x f e1 e2), consts $- x)
+  | AssignCall x f e1 e2 => ((AssignCall x f (opt_arith_constprop e1 consts)
+                                         (opt_arith_constprop e2 consts)), consts $- x)
   | Sequence c1 c2 =>
       let (c1', consts') := (opt_constprop' c1 consts) in
            let (c2', consts'') := (opt_constprop' c2 consts') in 
@@ -1253,34 +1254,6 @@ Fixpoint opt_constprop' (c: cmd) (consts : valuation) : cmd * valuation :=
                     (If e' (fst (opt_constprop' thn consts))
                         (fst (opt_constprop' els consts)), $0)
   | While e body => (While e (fst (opt_constprop' body $0)), $0)
-  end.
-
-Fixpoint opt_constprop_consts (c: cmd) (consts : valuation) : valuation :=
-  match c with
-  | Skip => consts
-  | Assign x e =>
-      match (opt_arith_constprop e consts) with
-      | Const n => consts $+ (x, n)
-      | _ => consts $- x
-      end
-  | AssignCall x _ _ _ => consts $- x
-  | Sequence c1 c2 => opt_constprop_consts c2 ((opt_constprop_consts c1 consts))
-  | _ => $0
-  end.
-
-Fixpoint opt_constprop2 (c: cmd) (consts : valuation) : cmd :=
-  match c with
-  | Assign x e =>
-      match (opt_arith_constprop e consts) with
-      | Const n => Assign x (Const n)
-      | e' => Assign x e'
-      end
-  | Sequence c1 c2 =>
-      Sequence (opt_constprop2 c1 consts) (opt_constprop2 c2 (opt_constprop_consts c1 consts))
-  | If e thn els => If (opt_arith_constprop e consts)
-                       (opt_constprop2 thn consts) (opt_constprop2 els consts)
-  | While e body => (While e (opt_constprop2 body $0))
-  | c' => c'
   end.
 
 Definition opt_constprop (c: cmd) : cmd := fst (opt_constprop' c $0).
@@ -1314,40 +1287,197 @@ Proof.
   equality.
 Qed.
 
+Lemma includes_delete_add : forall (v: fmap var nat) x a, (v $- x) $<= v $+ (x, a).
+Proof.
+  simplify.
+  apply includes_intro.
+  simplify.
+  assert (k = x \/ k <> x).
+  apply Classical_Prop.classic.
+  cases H0.
+  assert ((v $- x) $? k = None).
+  apply lookup_remove_eq.
+  equality.
+  equality.
+  assert ((v $- x) $? k = v $? k).
+  apply lookup_remove_ne.
+  assumption.
+  assert ((v $+ (x, a)) $? k = v $? k).
+  apply lookup_add_ne.
+  assumption.
+  equality.
+Qed.
+
+Lemma includes_transitive :
+  forall (v v1 v2: fmap var nat), v $<= v1 -> v1 $<= v2 -> v $<= v2.
+Proof.
+  simplify.
+  apply includes_intro.
+  simplify.
+  assert (v1 $? k = Some v0).
+  apply includes_lookup with v; assumption.
+  apply includes_lookup with v1; assumption.
+Qed.
+
+Lemma includes_delete :
+  forall (v v': fmap var nat) x, v $<= v' -> (v $- x) $<= (v' $- x).
+Proof.
+  simplify.
+  apply includes_intro.
+  simplify.
+  assert (k = x \/ k <> x).
+  apply Classical_Prop.classic.
+  cases H1.
+  assert ((v $- x) $? k = None).
+  apply lookup_remove_eq.
+  equality.
+  equality.
+  assert ((v $- x) $? k = v $? k).
+  apply lookup_remove_ne.
+  assumption.
+  assert ((v' $- x) $? k = v' $? k).
+  apply lookup_remove_ne.
+  assumption.
+  assert (v' $? k = Some v0).
+  apply includes_lookup with v.
+  equality.
+  assumption.
+  equality.
+Qed.
+
+Lemma opt_constprop_includes phi : forall c v v',
+    eval phi v c v' ->
+    (forall consts, consts $<= v ->
+    (snd (opt_constprop' c consts)) $<= v').
+Proof.
+  induct 1; simplify.
+  assumption.
+
+  cases (opt_arith_constprop e consts); simplify.
+  assert (interp_arith (opt_arith_constprop e consts) v =
+    interp_arith e v).
+  apply opt_arith_constprop_sound.
+  assumption.
+  rewrite Heq in H1.
+  simplify.
+  rewrite H in H1.
+  rewrite H1.
+  apply includes_add.
+  assumption.
+
+  assert ((consts $- x) $<= (v $- x)).
+  apply includes_delete; assumption.
+  assert ((v $- x) $<= (v $+ (x, a))).
+  apply includes_delete_add; assumption.
+  apply includes_transitive with (v $- x); assumption.
+
+  assert ((consts $- x) $<= (v $- x)).
+  apply includes_delete; assumption.
+  assert ((v $- x) $<= (v $+ (x, a))).
+  apply includes_delete_add; assumption.
+  apply includes_transitive with (v $- x); assumption.
+
+  assert ((consts $- x) $<= (v $- x)).
+  apply includes_delete; assumption.
+  assert ((v $- x) $<= (v $+ (x, a))).
+  apply includes_delete_add; assumption.
+  apply includes_transitive with (v $- x); assumption.
+
+  cases (opt_constprop' c1 consts); cases (opt_constprop' c2 v0); simplify.
+  assert (snd (opt_constprop' c2 v0) = v3).
+  rewrite Heq0.
+  equality.
+  subst.
+  apply IHeval2.
+  assert (snd (opt_constprop' c1 consts) = v0).
+  rewrite Heq.
+  equality.
+  subst.
+  apply IHeval1.
+  assumption.
+
+  all: apply empty_includes.
+Qed.
+
+Lemma opt_constprop_sound' phi : forall c v v',
+    eval phi v c v' ->
+    (forall consts, consts $<= v ->
+    eval phi v (fst (opt_constprop' c consts)) v').
+Proof.
+  induct 1; simplify.
+  eval_intro; eauto.
+  
+  cases (opt_arith_constprop e consts); simplify; eval_intro;
+    rewrite <- Heq; rewrite <- H; apply opt_arith_constprop_sound; eauto.
+
+  eval_intro.
+  eauto.
+  assert (interp_arith (opt_arith_constprop e1 consts) v = interp_arith e1 v).
+  apply opt_arith_constprop_sound.
+  eauto.
+  apply H5.
+  assert (interp_arith (opt_arith_constprop e2 consts) v = interp_arith e2 v).
+  apply opt_arith_constprop_sound.
+  eauto.
+  apply H5.
+  rewrite H0.
+  rewrite H1.
+  apply H2.
+  assumption.
+  
+  cases (opt_constprop' c1 consts); cases (opt_constprop' c2 v0); simplify.
+  econstructor.
+  assert (fst (opt_constprop' c1 consts) = c).
+  rewrite Heq.
+  equality.
+  subst.
+  apply IHeval1.
+  eauto.
+  assert (fst (opt_constprop' c2 v0) = c0).
+  rewrite Heq0.
+  equality.  
+  subst.
+  apply IHeval2.
+  assert (snd (opt_constprop' c1 consts) = v0).
+  rewrite Heq.
+  equality.  
+  subst.
+  apply opt_constprop_includes with (phi := phi) (v := v); assumption.
+  
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith e v).
+  apply opt_arith_constprop_sound.
+  assumption.
+  econstructor.
+  apply H3.
+  linear_arithmetic.
+  apply IHeval.
+  assumption.
+
+  assert (interp_arith (opt_arith_constprop e consts) v = interp_arith e v).
+  apply opt_arith_constprop_sound.
+  assumption.
+  eval_intro.
+  apply IHeval.
+  assumption.
+
+  eval_intro.
+  apply IHeval1.
+  apply empty_includes.
+  apply IHeval2 with v'.
+  apply includes_refl.
+
+  eval_intro.
+Qed.
+
 Lemma opt_constprop_sound phi : forall c v v',
     eval phi v c v' ->
     eval phi v (opt_constprop c) v'.
 Proof.
-  induct 1; simplify; try eval_intro; eauto.
-  cases (opt_arith_constprop e $0); simplify;
-    eval_intro; rewrite <- Heq; rewrite <- H; apply opt_arith_constprop_sound; apply empty_includes.
-
-  cases c1; simplify; eauto.
-  cases (opt_arith_constprop e $0); simplify.
-  invert IHeval1.
   simplify.
-  invert IHeval2; simplify.
-  cases c2; simplify; try equality.
-  cases (opt_arith_constprop e0 $0); simplify; equality.
-  
-  cases c2; simplify; try equality.
-  cases e1; simplify.
-  eauto.
-
-  cases (($0 $+ (x, n)) $? x2); simplify.
-  (*invert H.
-  Search (_ $+(_ , _)).
-  assert ((interp_arith e v) = n).
-  subst.
-  simplify.*)
-  assert (e0 = Var x2) by equality.
-  subst.
-  Search (_ $+ (_,  _)).
-  Search ($0).
-  simplify.
-  cases (($0 $+ (x, n)) $? x2); simplify.
-  Search (_ $? _).
-Admitted.
+  apply opt_constprop_sound'.
+  assumption.
+  apply empty_includes.
+Qed.
 
 (*|
 Loop unrolling
