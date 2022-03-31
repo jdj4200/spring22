@@ -222,14 +222,15 @@ Definition same_public_state pub (v1 v2: valuation) :=
  Suppose an expression contains only public variables. Under what valuations 
  do we expect them to evaluate to the same value?
 
-
+ All of them
 
  Suppose an expression evaluates to different values under different
  valuations. What do we know about this expression if the different valuations
  share the same public state? Do we know anything if the valuations do not 
  share the same public state?
 
-
+ Same public state, different values -> influenced by private state
+ Different public state -> we don't know anything
 
  The noninterference property says that running a program in states with 
  private variables holding potentially different values does not change the 
@@ -240,10 +241,12 @@ Definition same_public_state pub (v1 v2: valuation) :=
 
  When does this happen?  How does that translate in terms of the variables
  in `pc`?
+
+ That happens in If statements.
   
  Can a divergent execution affect the values of public variables?
 
-
+ Yes
 
  When a Confidential program executes, in what ways can it modify the 
  valuation? How does this depend on the values of `pc`?
@@ -251,6 +254,166 @@ Definition same_public_state pub (v1 v2: valuation) :=
 
 
  *)
+
+Lemma restrict_not_in: forall {K V} (k: K) (v: V) (s: set K) (m: fmap K V),
+    ~ k \in s ->
+    restrict s (m $+ (k, v)) = restrict s m.
+Proof.
+  simplify.
+  maps_equal.
+  excluded_middle (k0 \in s).
+    + rewrite !lookup_restrict_true by assumption.
+      simplify; equality.
+    + rewrite !lookup_restrict_false by assumption.
+      equality.
+Qed.
+
+Lemma restrict_subseteq: forall {K V} (s t: set K) (m n: fmap K V),
+    t \subseteq s->
+    restrict s m = restrict s n ->
+    restrict t m = restrict t n.
+Proof.
+  simplify.
+  maps_equal.
+  Search subseteq.
+  excluded_middle (k \in t).
+  assert (restrict s m $? k = restrict s n $? k) by equality.
+  +  assert (k \in s).
+     apply subseteq_In with t; assumption.
+     rewrite !lookup_restrict_true by assumption.
+     rewrite !lookup_restrict_true in H2 by assumption.
+     assumption.
+  + rewrite !lookup_restrict_false by assumption.
+    equality.
+Qed.
+
+Lemma restrict_vars_interp: forall v v2 e,
+    restrict (vars e) v = restrict (vars e) v2 ->
+    interp e v = interp e v2.
+Proof.
+  induct e; simplify.
+  equality.
+
+  assert (restrict {x} v $? x= restrict {x} v2 $? x) by equality.
+  rewrite !lookup_restrict_true in H0.
+  cases (v $? x); cases (v2 $? x); simplify; equality.
+  sets.
+  sets.
+
+  assert (restrict (vars e1) v = restrict (vars e1) v2).
+  apply restrict_subseteq with ({ } \cup (vars e1 \cup vars e2)); sets.
+  apply IHe1 in H0.
+  assert (restrict (vars e2) v = restrict (vars e2) v2).
+  apply restrict_subseteq with ({ } \cup (vars e1 \cup vars e2)); sets.
+  apply IHe2 in H1.
+  cases b; simplify; equality.
+Qed.
+
+Fixpoint has_public_assignments (pub : set var) (c : cmd) : Prop :=
+  match c with
+  | Skip => False
+  | Assign x _ => x \in pub
+  | Sequence c1 c2 => has_public_assignments pub c1 \/ has_public_assignments pub c2
+  | If _ thn els => has_public_assignments pub thn \/ has_public_assignments pub els
+  | While _ body => has_public_assignments pub body
+  end.
+
+Lemma conditional_divergence: forall v v2 e pub pc thn els,
+    interp e v <> interp e v2 ->
+    same_public_state pub v v2 ->
+    has_public_assignments pub (If e thn els) ->
+    ~ Confidential pub pc (If e thn els).
+Proof.
+  induct e; simplify.
+  equality.
+
+  cases (v $? x); cases (v2 $? x); simplify.
+  propositional.
+  invert H2.
+Admitted.
+
+Lemma non_interference' :
+  forall pub c v1 v1',
+    eval v1 c v1' ->
+    forall v2 v2' pc, 
+    eval v2 c v2' ->
+    Confidential pub pc c ->
+    same_public_state pub v1 v2 ->
+    same_public_state pub v1' v2'.
+Proof.
+  induct 1; simplify.
+  invert H0.
+  invert H.
+  assumption.
+  
+  unfold same_public_state.
+  invert H.
+  invert H1.
+  invert H0.
+  assert (restrict pub (v $+ (x, interp e v)) = restrict pub v).
+  apply restrict_not_in.
+  assumption.
+  assert (restrict pub (v2 $+ (x, interp e v2)) = restrict pub v2).
+  apply restrict_not_in.
+  assumption.
+  equality.
+
+  clear H5.
+  assert (restrict(vars e) v = restrict (vars e) v2).
+  apply restrict_subseteq with pub; assumption.
+  assert (interp e v = interp e v2).
+  apply restrict_vars_interp; assumption.
+  rewrite H0.
+  excluded_middle (x \in pub).
+  assert (restrict pub (v $+ (x, interp e v2)) = (restrict pub v) $+ (x, interp e v2)).
+  apply Pset8Sig.Unnamed_thm; assumption.
+  assert (restrict pub (v2 $+ (x, interp e v2)) = (restrict pub v2) $+ (x, interp e v2)).
+  apply Pset8Sig.Unnamed_thm; assumption.
+  equality.
+  assert (restrict pub (v $+ (x, interp e v)) = restrict pub v).
+  apply restrict_not_in.
+  assumption.
+  assert (restrict pub (v2 $+ (x, interp e v2)) = restrict pub v2).
+  apply restrict_not_in.
+  assumption.
+  equality.
+  
+  invert H1.
+  invert H2.
+  assert (same_public_state pub v1 v4).
+  apply IHeval1 with (v2 := v0) (pc := pc); assumption.
+  apply IHeval2 with (v2 := v4) (pc := pc); assumption.
+  
+  invert H2.
+  invert H1.
+  apply IHeval with (v2 := v2) (pc := (pc \cup vars e)); assumption.
+  
+  admit.
+
+  invert H2.
+  invert H1.
+  admit.
+  apply IHeval with (v2 := v2) (pc := (pc \cup vars e)); assumption.
+
+  invert H2.
+  apply IHeval2 with (v2 := v'0) (pc := pc).
+  assumption.
+  assumption.
+  invert H3.
+  apply IHeval1 with (v2 := v2) (pc := (pc \cup vars e)); assumption.
+
+  
+
+  
+  assert (same_public_state pub v' v2).
+  apply IHeval1 with (v2 := v0) (pc := pc); assumption.
+  apply IHeval2 with (v2 := v4) (pc := pc); assumption.
+
+  
+  admit.
+  
+  
+Admitted.
 
 (* HINT 1-2 (see Pset8Sig.v) *) 
 Theorem non_interference :
@@ -261,6 +424,23 @@ Theorem non_interference :
     same_public_state pub v1 v2 ->
     same_public_state pub v1' v2'.
 Proof.
+  induct 1; simplify.
+  invert H0.
+  invert H.
+  assumption.
+  unfold same_public_state.
+  invert H.
+  invert H1.
+  invert H0.
+  assert (restrict pub (v $+ (x, interp e v)) = restrict pub v).
+  apply restrict_not_in.
+  assumption.
+  assert (restrict pub (v2 $+ (x, interp e v2)) = restrict pub v2).
+  apply restrict_not_in.
+  assumption.
+  equality.
+  admit.
+  invert H1.
 Admitted.
 
 (*|
