@@ -242,7 +242,7 @@ Definition same_public_state pub (v1 v2: valuation) :=
  When does this happen?  How does that translate in terms of the variables
  in `pc`?
 
- That happens in If statements.
+ That happens in If statements and While loops, where there are private vars in pc
   
  Can a divergent execution affect the values of public variables?
 
@@ -251,6 +251,8 @@ Definition same_public_state pub (v1 v2: valuation) :=
  When a Confidential program executes, in what ways can it modify the 
  valuation? How does this depend on the values of `pc`?
 
+ It can modify the valuation by updating any private vars,
+ or public vars, but only if there are no private vars in pc
 
 
  *)
@@ -309,28 +311,142 @@ Proof.
   cases b; simplify; equality.
 Qed.
 
-Fixpoint has_public_assignments (pub : set var) (c : cmd) : Prop :=
+Fixpoint assignments (c : cmd) : set var :=
   match c with
-  | Skip => False
-  | Assign x _ => x \in pub
-  | Sequence c1 c2 => has_public_assignments pub c1 \/ has_public_assignments pub c2
-  | If _ thn els => has_public_assignments pub thn \/ has_public_assignments pub els
-  | While _ body => has_public_assignments pub body
+  | Skip => {}
+  | Assign x _ => {x}
+  | Sequence c1 c2 => assignments c1 \cup assignments c2
+  | If _ thn els => assignments thn \cup assignments els
+  | While _ body => assignments body
   end.
 
-Lemma conditional_divergence: forall v v2 e pub pc thn els,
+Search "\cup".
+
+Lemma same_public_vars: forall pub v v2,
+    same_public_state pub v v2 ->
+    forall x, x \in pub -> (v $? x) = (v2 $? x).
+Proof.
+  simplify.
+  invert H.
+  Search restrict.
+  assert (restrict pub v $? x= restrict pub v2 $? x) by equality.
+  rewrite !lookup_restrict_true in H by assumption.
+  assumption.
+Qed.
+
+Lemma contrapositive: forall (P Q : Prop), (P -> Q) -> (~Q -> ~P).
+Proof.
+  simplify.
+  propositional.
+Qed.
+
+Lemma private_var: forall e v v2 pub,
     interp e v <> interp e v2 ->
     same_public_state pub v v2 ->
-    has_public_assignments pub (If e thn els) ->
-    ~ Confidential pub pc (If e thn els).
+    ~ vars e \subseteq pub.
 Proof.
   induct e; simplify.
   equality.
+  
+  assert (forall x, x \in pub -> (v $? x) = (v2 $? x)).
+  apply same_public_vars; assumption.
+  assert (x \in pub -> (v $? x) = (v2 $? x)).
+  apply H1.
+  assert ((v $? x) <> (v2 $? x) -> ~ x \in pub).
+  apply contrapositive; assumption.
+  assert (~x \in pub).
+  apply H3.
+  cases (v $? x); cases (v2 $? x); simplify; equality.
+  sets.
 
-  cases (v $? x); cases (v2 $? x); simplify.
-  propositional.
-  invert H2.
-Admitted.
+  assert ((interp e1 v <> interp e1 v2) \/ (~ interp e1 v <> interp e1 v2)).
+  apply Classical_Prop.classic.
+  cases H1; simplify.
+  assert (~ vars e1 \subseteq pub).
+  apply IHe1 with (v := v) (v2 := v2); assumption.
+  sets.
+
+  assert (interp e2 v <> interp e2 v2).
+  cases b; simplify; linear_arithmetic.
+  assert (~ vars e2 \subseteq pub).
+  apply IHe2 with (v := v) (v2 := v2); assumption.
+  sets.
+Qed.
+
+Lemma divergence: forall c v v2 e pub pc,
+    interp e v <> interp e v2 ->
+    same_public_state pub v v2 ->
+    Confidential pub (pc \cup vars e) c ->
+    assignments c \cap pub = {}.
+Proof.
+  simplify.
+  assert (~ vars e \subseteq pub).
+  apply private_var with (v := v) (v2 := v2); assumption.
+  induct c; simplify.
+  sets.
+  invert H1; sets.
+
+  invert H1.
+  assert (assignments c1 \cap pub = { }).
+  apply IHc1 with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  assert (assignments c2 \cap pub = { }).
+  apply IHc2 with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  sets.
+
+  invert H1.
+  assert (assignments c1 \cap pub = { }).
+  apply IHc1 with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
+  replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
+    (({ } \cup (pc \cup vars e0)) \cup vars e).
+  assumption.
+  sets.
+  assert (assignments c2 \cap pub = { }).
+  apply IHc2 with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
+  replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
+    (({ } \cup (pc \cup vars e0)) \cup vars e).
+  assumption.
+  sets.
+  sets.
+
+  invert H1.
+  apply IHc with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
+  replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
+    (({ } \cup (pc \cup vars e0)) \cup vars e).
+  assumption.
+  sets.
+Qed.
+
+Lemma no_assignments_same_public: forall c pub v v2,
+    assignments c \cap pub = {} ->
+    eval v c v2 ->
+    same_public_state pub v v2.
+Proof.
+  induct 2; simplify.
+  equality.
+  unfold same_public_state.
+  assert (~ x \in pub).
+  sets.
+  apply restrict_not_in with (v := interp e v) (m := v)  in H0.
+  equality.
+  
+  assert (same_public_state pub v v1).
+  apply IHeval1; sets.
+  assert (same_public_state pub v1 v2).
+  apply IHeval2; sets.
+  equality.
+
+  apply IHeval; sets.
+  
+  apply IHeval; sets.
+
+  assert (same_public_state pub v v').
+  apply IHeval1; sets.
+  assert (same_public_state pub v' v'').
+  apply IHeval2; sets.
+  equality.
+
+  equality.
+Qed.
 
 Lemma non_interference' :
   forall pub c v1 v1',
@@ -383,16 +499,37 @@ Proof.
   assert (same_public_state pub v1 v4).
   apply IHeval1 with (v2 := v0) (pc := pc); assumption.
   apply IHeval2 with (v2 := v4) (pc := pc); assumption.
-  
-  invert H2.
-  invert H1.
-  apply IHeval with (v2 := v2) (pc := (pc \cup vars e)); assumption.
-  
-  admit.
 
   invert H2.
   invert H1.
-  admit.
+  apply IHeval with (v2 := v2) (pc := (pc \cup vars e)); assumption.
+
+  assert (assignments thn \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H0.
+  assert (assignments els \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H11.
+  equality.
+  assumption.
+  assumption.
+  
+  invert H2.
+  invert H1.
+  assert (assignments thn \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H11.
+  assert (assignments els \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H0.
+  equality.
+  assumption.
+  assumption.
+  
   apply IHeval with (v2 := v2) (pc := (pc \cup vars e)); assumption.
 
   invert H2.
@@ -402,18 +539,41 @@ Proof.
   invert H3.
   apply IHeval1 with (v2 := v2) (pc := (pc \cup vars e)); assumption.
 
-  
+  invert H3.
+  assert (assignments body \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2') (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H0.
+  assert (assignments (while e loop body done) \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2') (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  constructor.
+  replace ((pc \cup vars e) \cup vars e) with (pc \cup vars e) by sets.
+  assumption.
+  apply no_assignments_same_public with (pub := pub) in H1.
+  equality.
+  assumption.
+  assumption.
 
-  
-  assert (same_public_state pub v' v2).
-  apply IHeval1 with (v2 := v0) (pc := pc); assumption.
-  apply IHeval2 with (v2 := v4) (pc := pc); assumption.
+  invert H0.
+  invert H1.
+  assert (assignments body \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  apply no_assignments_same_public with (pub := pub) in H7.
+  assert (assignments (while e loop body done) \cap pub = {}).
+  apply divergence with (v := v) (v2 := v2) (e := e) (pc := pc); eauto.
+  linear_arithmetic.
+  constructor.
+  replace ((pc \cup vars e) \cup vars e) with (pc \cup vars e) by sets.
+  assumption.
+  apply no_assignments_same_public with (pub := pub) in H9.
+  equality.
+  assumption.
+  assumption.
 
-  
-  admit.
-  
-  
-Admitted.
+  assumption.
+Qed.
 
 (* HINT 1-2 (see Pset8Sig.v) *) 
 Theorem non_interference :
@@ -424,24 +584,9 @@ Theorem non_interference :
     same_public_state pub v1 v2 ->
     same_public_state pub v1' v2'.
 Proof.
-  induct 1; simplify.
-  invert H0.
-  invert H.
-  assumption.
-  unfold same_public_state.
-  invert H.
-  invert H1.
-  invert H0.
-  assert (restrict pub (v $+ (x, interp e v)) = restrict pub v).
-  apply restrict_not_in.
-  assumption.
-  assert (restrict pub (v2 $+ (x, interp e v2)) = restrict pub v2).
-  apply restrict_not_in.
-  assumption.
-  equality.
-  admit.
-  invert H1.
-Admitted.
+  simplify.
+  apply non_interference' with (c := c) (v1 := v1) (v2 := v2) (pc := {}); assumption.
+Qed.
 
 (*|
 Congratulations, you have proved that our type system is *sound*: it catches all leaky programs!  But it is not *complete*: there are some good programs that it rejects, too.  In other words, it *overapproximates* the set of unsafe programs.
