@@ -277,7 +277,6 @@ Lemma restrict_subseteq: forall {K V} (s t: set K) (m n: fmap K V),
 Proof.
   simplify.
   maps_equal.
-  Search subseteq.
   excluded_middle (k \in t).
   assert (restrict s m $? k = restrict s n $? k) by equality.
   +  assert (k \in s).
@@ -296,7 +295,7 @@ Proof.
   induct e; simplify.
   equality.
 
-  assert (restrict {x} v $? x= restrict {x} v2 $? x) by equality.
+  assert (restrict {x} v $? x = restrict {x} v2 $? x) by equality.
   rewrite !lookup_restrict_true in H0.
   cases (v $? x); cases (v2 $? x); simplify; equality.
   sets.
@@ -320,15 +319,12 @@ Fixpoint assignments (c : cmd) : set var :=
   | While _ body => assignments body
   end.
 
-Search "\cup".
-
 Lemma same_public_vars: forall pub v v2,
     same_public_state pub v v2 ->
     forall x, x \in pub -> (v $? x) = (v2 $? x).
 Proof.
   simplify.
   invert H.
-  Search restrict.
   assert (restrict pub v $? x= restrict pub v2 $? x) by equality.
   rewrite !lookup_restrict_true in H by assumption.
   assumption.
@@ -384,6 +380,7 @@ Proof.
   apply private_var with (v := v) (v2 := v2); assumption.
   induct c; simplify.
   sets.
+  
   invert H1; sets.
 
   invert H1.
@@ -397,23 +394,20 @@ Proof.
   assert (assignments c1 \cap pub = { }).
   apply IHc1 with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
   replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
-    (({ } \cup (pc \cup vars e0)) \cup vars e).
+    (({ } \cup (pc \cup vars e0)) \cup vars e) by sets.
   assumption.
-  sets.
   assert (assignments c2 \cap pub = { }).
   apply IHc2 with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
   replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
-    (({ } \cup (pc \cup vars e0)) \cup vars e).
+    (({ } \cup (pc \cup vars e0)) \cup vars e) by sets.
   assumption.
-  sets.
   sets.
 
   invert H1.
   apply IHc with (v := v) (v2 := v2) (e := e0) (pc := pc \cup vars e); eauto.
   replace ({ } \cup ((pc \cup vars e) \cup vars e0)) with
-    (({ } \cup (pc \cup vars e0)) \cup vars e).
+    (({ } \cup (pc \cup vars e0)) \cup vars e) by sets.
   assumption.
-  sets.
 Qed.
 
 Lemma no_assignments_same_public: forall c pub v v2,
@@ -424,8 +418,7 @@ Proof.
   induct 2; simplify.
   equality.
   unfold same_public_state.
-  assert (~ x \in pub).
-  sets.
+  assert (~ x \in pub) by sets.
   apply restrict_not_in with (v := interp e v) (m := v)  in H0.
   equality.
   
@@ -594,11 +587,25 @@ Congratulations, you have proved that our type system is *sound*: it catches all
 Can you give an example of a safe program (a program that does not leak data) that our system would reject?
 |*)
 
-Definition tricky_example : cmd. Admitted.
+Definition tricky_example : cmd :=
+  "a" <- 1 ;; "b" <- 1 ;; when "x" then "x" <- "a" else "x" <- "b" done.
 
 Lemma tricky_rejected : ~ Confidential pub_example {} tricky_example.
 Proof.
-Admitted.
+  propositional.
+  invert H.
+  invert H4.
+  invert H2.
+  unfold pub_example in H1.
+  contradict H1.
+  sets.
+  simplify.
+  unfold pub_example in H4.
+  assert ("a" \in {"a"}) by sets.
+  apply subseteq_In with (s2 := {"x", "y", "z"}) in H.
+  sets.
+  assumption.
+Qed.
 
 Lemma tricky_confidential :
   forall v1 v1' v2 v2',
@@ -607,7 +614,147 @@ Lemma tricky_confidential :
     same_public_state pub_example v1 v2 ->
     same_public_state pub_example v1' v2'.
 Proof.
-Admitted.
+  simplify.
+  invert H.
+  invert H5.
+  invert H4.
+  invert H8.
+  replace (interp 1 v1) with 1 in H7 by equality.
+  replace (interp 1 (v1 $+ ("a", 1))) with 1 in H7 by equality.
+  invert H7.
+  invert H8.
+  
+  invert H0.
+  invert H4.
+  invert H3.
+  invert H8.
+  replace (interp 1 v2) with 1 in H7 by equality.
+  replace (interp 1 (v2 $+ ("a", 1))) with 1 in H7 by equality.
+  invert H7.
+  invert H8.
+
+  replace (interp "a" (v1 $+ ("a", 1) $+ ("b", 1))) with 1.
+  replace (interp "a" (v2 $+ ("a", 1) $+ ("b", 1))) with 1.
+
+  unfold same_public_state in *.
+  assert ((restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1) $+ ("x", 1)))
+          = (restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1))) $+ ("x", 1)).
+  apply Pset8Sig.Unnamed_thm.
+  unfold pub_example.
+  sets.
+  assert ((restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1) $+ ("x", 1)))
+          = (restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1))) $+ ("x", 1)).
+  apply Pset8Sig.Unnamed_thm.
+  unfold pub_example.
+  sets.
+  replace (restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1))) with (restrict pub_example (v1 $+ ("a", 1))) in H.
+  replace (restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1))) with (restrict pub_example (v2 $+ ("a", 1))) in H0.
+  replace (restrict pub_example (v1 $+ ("a", 1))) with (restrict pub_example v1) in H.
+  replace (restrict pub_example (v2 $+ ("a", 1))) with (restrict pub_example v2) in H0.
+  equality.
+  unfold pub_example in *.
+  assert (~ "a" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v2) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "a" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v1) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "b" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v2 $+ ("a", 1))) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "b" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v1 $+ ("a", 1))) in H2.
+  equality.
+  simplify.
+  equality.
+  simplify.
+  equality.
+
+  invert H8.
+  unfold pub_example in *.
+  assert ({"x"} \subseteq {"x", "y", "z"}) by sets.
+  apply restrict_subseteq with (m := v1) (n := v2) in H.
+  assert (~ "a" \in {"x"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v1) in H0 as H2.
+  apply restrict_not_in with (v := 1) (m := v2) in H0 as H3.
+  assert (~ "b" \in {"x"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v1 $+ ("a", 1))) in H4 as H7.
+  apply restrict_not_in with (v := 1) (m := (v2 $+ ("a", 1))) in H4 as H8.
+  assert (restrict {"x"} (v1 $+ ("a", 1) $+ ("b", 1)) = restrict {"x"} (v2 $+ ("a", 1) $+ ("b", 1))) by equality.
+  apply restrict_vars_interp with (e := "x") in H9.
+  equality.
+  apply H1.
+
+  invert H8.
+  
+  invert H0.
+  invert H4.
+  invert H3.
+  invert H8.
+  replace (interp 1 v2) with 1 in H7 by equality.
+  replace (interp 1 (v2 $+ ("a", 1))) with 1 in H7 by equality.
+  invert H7.
+  invert H8.
+
+  unfold pub_example in *.
+  assert ({"x"} \subseteq {"x", "y", "z"}) by sets.
+  apply restrict_subseteq with (m := v1) (n := v2) in H.
+  assert (~ "a" \in {"x"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v1) in H0 as H2.
+  apply restrict_not_in with (v := 1) (m := v2) in H0 as H3.
+  assert (~ "b" \in {"x"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v1 $+ ("a", 1))) in H4 as H7.
+  apply restrict_not_in with (v := 1) (m := (v2 $+ ("a", 1))) in H4 as H8.
+  assert (restrict {"x"} (v1 $+ ("a", 1) $+ ("b", 1)) = restrict {"x"} (v2 $+ ("a", 1) $+ ("b", 1))) by equality.
+  apply restrict_vars_interp with (e := "x") in H9.
+  equality.
+  apply H1.
+
+  invert H8.
+
+  replace (interp "b" (v1 $+ ("a", 1) $+ ("b", 1))) with 1.
+  replace (interp "b" (v2 $+ ("a", 1) $+ ("b", 1))) with 1.
+  unfold same_public_state in *.
+  assert ((restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1) $+ ("x", 1)))
+          = (restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1))) $+ ("x", 1)).
+  apply Pset8Sig.Unnamed_thm.
+  unfold pub_example.
+  sets.
+  assert ((restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1) $+ ("x", 1)))
+          = (restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1))) $+ ("x", 1)).
+  apply Pset8Sig.Unnamed_thm.
+  unfold pub_example.
+  sets.
+  replace (restrict pub_example (v1 $+ ("a", 1) $+ ("b", 1))) with (restrict pub_example (v1 $+ ("a", 1))) in H.
+  replace (restrict pub_example (v2 $+ ("a", 1) $+ ("b", 1))) with (restrict pub_example (v2 $+ ("a", 1))) in H0.
+  replace (restrict pub_example (v1 $+ ("a", 1))) with (restrict pub_example v1) in H.
+  replace (restrict pub_example (v2 $+ ("a", 1))) with (restrict pub_example v2) in H0.
+  equality.
+  unfold pub_example in *.
+  assert (~ "a" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v2) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "a" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := v1) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "b" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v2 $+ ("a", 1))) in H2.
+  equality.
+  unfold pub_example in *.
+  assert (~ "b" \in {"x", "y", "z"}) by sets.
+  apply restrict_not_in with (v := 1) (m := (v1 $+ ("a", 1))) in H2.
+  equality.
+  simplify.
+  equality.
+  simplify.
+  equality.
+Qed.
+
 End Impl.
 
 Module ImplCorrect : Pset8Sig.S := Impl.
