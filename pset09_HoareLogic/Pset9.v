@@ -480,7 +480,13 @@ Theorem max3_ok:
   max3
   <{ fun/inv tr' _ _ => max3_spec tr' }>.
 Proof.
-Admitted.
+  unfold max3_spec.
+  ht; eexists; eexists; eexists.
+  rewrite !max_r; eauto; try linear_arithmetic.
+  rewrite max_r; rewrite max_l; eauto; try linear_arithmetic.
+  rewrite !max_r; eauto; try linear_arithmetic.
+  rewrite max_l;  eauto; try linear_arithmetic.
+Qed.
 
 (*|
 Euclidian Algorithm for GCD
@@ -512,7 +518,7 @@ Example euclidean_algorithm a b inv :=
    output "a")%cmd.
 
 Definition euclidean_algorithm_invariant (a b : nat) : assertion :=
-   fun/inv _ _ _ => True.
+   fun/inv tr h v => (Nat.gcd (v $! "a") (v $! "b") = Nat.gcd a b) /\ tr = [].
 
 Local Hint Unfold euclidean_algorithm_invariant : core.
 
@@ -526,7 +532,17 @@ Theorem euclidean_algorithm_ok : forall a b,
          v $! "a" = v $! "b"
          /\ exists d, tr = [Out d]/\ Nat.gcd a b = d }>.
 Proof.
-Admitted.
+  ht.
+  rewrite Nat.gcd_sub_diag_r; eauto; try linear_arithmetic.
+  rewrite Nat.gcd_comm; rewrite Nat.gcd_sub_diag_r.
+  rewrite Nat.gcd_comm; equality.
+  linear_arithmetic.
+  rewrite e in H.
+  rewrite Nat.gcd_diag in H.
+  exists (v $! "a").
+  propositional.
+  equality.
+Qed.
 
 (*|
 Streaming Fibonacci sequence
@@ -567,7 +583,8 @@ Here's the definition of the loop invariant that you will have to modify to comp
 
 (* HINT 2 (see Pset9Sig.v) *) 
 Definition fibonacci_invariant (n: nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => exists tl, tr =  Out (v $! "y") :: Out (v $! "x") :: tl /\
+                              fibonacci_spec ( Out (v $! "y" + v $! "x") :: Out (v $! "y") :: Out (v $! "x") :: tl).
 
 Local Hint Unfold fibonacci_invariant : core.
 Local Hint Constructors fibonacci_spec : core.
@@ -577,7 +594,20 @@ Theorem fibonacci_ok (n: nat):
   fibonacci n (fibonacci_invariant n)
   <{ fun/inv tr' _ _ => fibonacci_spec tr' }>.
 Proof.
-Admitted.
+  ht.
+  exists [].
+  propositional.
+  apply FibRec with (x := 0) (y := 1) (tr := []).
+  apply FibInit.
+  exists (Out (x3 $! "x") :: x4).
+  propositional.
+  replace (x3 $! "x" + x3 $! "y" + x3 $! "y") with (x3 $! "y" +(x3 $! "x" + x3 $! "y")) by linear_arithmetic.
+  apply FibRec with (x := (x3 $! "y")) (y := (x3 $! "x" + x3 $! "y")) (tr := ( Out (x3 $! "x") :: x4)).
+  rewrite Nat.add_comm.
+  assumption.
+  invert H1.
+  assumption.
+Qed.
 
 (*|
 Streaming factorial
@@ -609,7 +639,8 @@ Inductive fact_spec : nat -> trace -> Prop :=
     fact_spec (S n) (Out (x * S n) :: Out x :: tr).
 
 Definition fact_invariant (n: nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => (v $! "cnt") < S n /\ (v $! "n") = n /\ exists tl, tr = Out (v $! "x") :: tl /\
+fact_spec (S (v $! "cnt")) (Out ((v $! "x") * (S (v $! "cnt"))) :: Out (v $! "x") :: tl).
 
 Local Hint Unfold fact_invariant : core.
 Local Hint Constructors fact_spec : core.
@@ -620,7 +651,16 @@ Theorem fact_ok (n: nat):
   fact (fact_invariant n)
   <{ fun/inv tr' _ _ => fact_spec n tr' }>.
 Proof.
-Admitted.
+  ht.
+  exists [].
+  propositional.
+  apply FactRec with (x := 1) (n := 0) (tr := []).
+  apply FactInit.
+  invert H3.
+  assert (v $! "n" = v $! "cnt") by linear_arithmetic.
+  rewrite <- H0 in H2.
+  assumption.
+Qed.
 
 Fixpoint fact_rec (n: nat) :=
   match n with
@@ -714,7 +754,8 @@ As always, the key part of the proof is the choice of invariant.
 |*)
 
 Definition mailbox_invariant : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v => (tr = [] /\ h = $0 /\ v $! "done" = 0) \/ (exists tl, tr = In 0 :: tl /\ (v $! "done" = 1) /\ mailbox_done h tr) \/
+    (exists tl h' ret, tr = (Out ret :: In (v $! "val") :: In (v $! "address") :: tl) /\ h = h' $+ (v $! "address", v $! "val") /\ h' $! (v $! "address") = ret /\ v $! "done" = 0 /\ mailbox_spec h tr).
 
 Local Hint Unfold mailbox_invariant : core.
 Local Hint Constructors mailbox_spec mailbox_done : core.
@@ -725,7 +766,24 @@ Theorem mailbox_ok:
   mailbox mailbox_invariant
   <{ fun/inv tr' h' _ => mailbox_done h' tr' }>.
 Proof.
-Admitted.
+  ht.
+  - right.
+  right.
+  exists []; exists $0; exists 0.
+  propositional.
+  simplify.
+  equality.
+  apply MBPut; simplify; eauto.
+
+  - right.
+    right.
+    exists (Out (x8 $! (x5 $! "address"))
+                :: In (x5 $! "val") :: In (x5 $! "address") :: x7).
+    exists (x8 $+ (x5 $! "address", x5 $! "val")).
+    exists (x8 $+ (x5 $! "address", x5 $! "val") $! x6).
+    propositional.
+    apply MBPut; eauto.
+Qed.
 
 (*|
 Streaming search
@@ -835,7 +893,9 @@ You'll need to customize this invariant:
 |*)
 
 Definition search_invariant (ptr: nat) (data: list nat) : assertion :=
-   fun/inv _ _ _ => True.
+  fun/inv tr h v =>  array_at h ptr data /\ (exists hd, tr = hd ++ [In (v $! "needle")]) /\ (Datatypes.length tr <= 1 + Datatypes.length data - v $! "length") /\ ((data = [] /\ tr = [In (v $! "needle")] /\ (v $! "length" = 0)) \/ (v $! "length" = Datatypes.length data) \/
+                                               (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") = v $! "needle" /\ (exists tl stack, (tr = Out (v $! "length") :: tl) /\ search_spec (v $! "needle") (v $! "length") ( (v $! "needle") :: stack) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1)) \/
+                       (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") <> v $! "needle" /\ exists stack, search_spec (v $! "needle") (v $! "length") ( (h $! (v $! "ptr" + v $! "length") :: stack)) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1)).
 
 Local Hint Unfold search_invariant : core.
 Local Hint Constructors search_spec search_done : core.
@@ -853,6 +913,148 @@ Theorem search_ok ptr data:
        array_at h' ptr data /\
        search_done data tr' }>.
 Proof.
+  ht.
+  exists []; equality.
+  cases (x0 $! "length"); simplify; linear_arithmetic.
+  exists (Out (x0 $! "length" - 1) :: x1); equality.
+  exists (Out (x0 $! "length" - 1) :: x1); equality.
+  exists (Out (x0 $! "length" - 1) :: x1); equality.
+  cases (x0 $! "length" - 1); cases (x0 $! "length"); simplify; linear_arithmetic.
+  cases (x0 $! "length" - 1); cases (x0 $! "length"); simplify; linear_arithmetic.
+  cases (x0 $! "length" - 1); cases (x0 $! "length"); simplify; linear_arithmetic.
+  cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
+  cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
+  cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
+  - cases (x0 $! "length"); simplify.
+    equality.
+  right.
+  right.
+  left.
+  propositional.
+  linear_arithmetic.
+  exists (x1 ++ [In (x0 $! "needle")]); exists []; eexists.
+  equality.
+  propositional.
+  assert (n = Datatypes.length data - 1) by linear_arithmetic.
+  rewrite H0 in H5.
+  replace (n - 0) with (S n - 1) by linear_arithmetic.
+  constructor.
+  assumption.
+  equality.
+  assert (Datatypes.length (x1 ++ [In (x0 $! "needle")]) <= 1) by linear_arithmetic.
+  Search Datatypes.length.
+  rewrite app_length in H1.
+  simplify.
+  assert (Datatypes.length x1 = 0) by linear_arithmetic.
+  Search Datatypes.length.
+  apply length_zero_iff_nil in H2.
+  subst.
+  simplify.
+  constructor.
+  assert (n = Datatypes.length data - 1) by linear_arithmetic.
+  rewrite H0.
+  simplify.
+  linear_arithmetic.
+
+  -
+    right.
+    right.
+    left.
+    propositional.
+    linear_arithmetic.
+    exists (x1 ++ [In (x0 $! "needle")]).
+    eexists.
+    propositional.
+    constructor; eauto.
+    simplify.
+    linear_arithmetic.
+
+  -
+    right.
+    right.
+    left.
+    propositional.
+    linear_arithmetic.
+    exists (x1 ++ [In (x0 $! "needle")]).
+    eexists.
+    propositional.
+    constructor; eauto.
+    simplify.
+    linear_arithmetic.
+    
+  -
+    right.
+    right.
+    right.
+    propositional.
+    linear_arithmetic.
+    exists [].
+    propositional.
+    cases (x $! "length"); simplify.
+    linear_arithmetic.
+    assert (Datatypes.length (x0 ++ [In (x $! "needle")]) <= 1) by linear_arithmetic.
+    rewrite app_length in H0.
+    simplify.
+    assert (Datatypes.length x0 = 0) by linear_arithmetic.
+    apply length_zero_iff_nil in H1.
+    subst.
+    simplify.
+    replace (n0 - 0) with (S n0 - 1) by linear_arithmetic.
+    constructor; eauto.
+    simplify.
+    linear_arithmetic.
+
+  -
+    right.
+    right.
+    right.
+    propositional.
+    linear_arithmetic.
+    eexists.
+    propositional.
+    constructor; eauto.
+    simplify.
+    linear_arithmetic.
+
+  -
+    right.
+    right.
+    right.
+    propositional.
+    linear_arithmetic.
+    eexists.
+    propositional.
+    constructor; eauto.
+    simplify.
+    linear_arithmetic.
+
+  -
+    cases (v $! "length"); simplify.
+    rewrite app_length in H2.
+    simplify.
+    assert (Datatypes.length x = 0) by linear_arithmetic.
+    apply length_zero_iff_nil in H0.
+    subst.
+    simplify.
+    eauto.
+    equality.
+
+  -
+    invert H; simplify.
+    cases (v $! "length"); simplify.
+    rewrite app_length in H2.
+    simplify.
+    assert (Datatypes.length x = 0) by linear_arithmetic.
+    apply length_zero_iff_nil in H.
+    subst.
+    simplify.
+    eauto.
+    equality.
+    equality.
+
+  -
+    apply SearchDone with (needle := v $! "needle") (offset := v $! "length").
+    assumption.
 Admitted.
 
 (*|
