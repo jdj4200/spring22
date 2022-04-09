@@ -768,12 +768,12 @@ Theorem mailbox_ok:
 Proof.
   ht.
   - right.
-  right.
-  exists []; exists $0; exists 0.
-  propositional.
-  simplify.
-  equality.
-  apply MBPut; simplify; eauto.
+    right.
+    exists []; exists $0; exists 0.
+    propositional.
+    simplify.
+    equality.
+    apply MBPut; simplify; eauto.
 
   - right.
     right.
@@ -893,13 +893,29 @@ You'll need to customize this invariant:
 |*)
 
 Definition search_invariant (ptr: nat) (data: list nat) : assertion :=
-  fun/inv tr h v =>  array_at h ptr data /\ (exists hd, tr = hd ++ [In (v $! "needle")]) /\ (Datatypes.length tr <= 1 + Datatypes.length data - v $! "length") /\ ((data = [] /\ tr = [In (v $! "needle")] /\ (v $! "length" = 0)) \/ (v $! "length" = Datatypes.length data) \/
-                                               (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") = v $! "needle" /\ (exists tl stack, (tr = Out (v $! "length") :: tl) /\ search_spec (v $! "needle") (v $! "length") ( (v $! "needle") :: stack) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1)) \/
-                       (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") <> v $! "needle" /\ exists stack, search_spec (v $! "needle") (v $! "length") ( (h $! (v $! "ptr" + v $! "length") :: stack)) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1)).
+  fun/inv tr h v =>  array_at h ptr data /\ (v $! "ptr" = ptr) /\ (exists hd, tr = hd ++ [In (v $! "needle")]) /\ (Datatypes.length tr <= 1 + Datatypes.length data - v $! "length") /\ ((data = [] /\ tr = [In (v $! "needle")] /\ (v $! "length" = 0)) \/ (v $! "length" = Datatypes.length data) \/
+                                               (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") = v $! "needle" /\ (exists tl stack, (tr = Out (v $! "length") :: tl) /\ search_spec (v $! "needle") (v $! "length") ( (v $! "needle") :: stack) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1 /\ array_at h (ptr + v $! "length" + 1) stack) \/
+                       (v $! "length" < Datatypes.length data /\ h $! (v $! "ptr" + v $! "length") <> v $! "needle" /\ exists stack, search_spec (v $! "needle") (v $! "length") ( (h $! (v $! "ptr" + v $! "length") :: stack)) tr /\ Datatypes.length stack = Datatypes.length data - v $! "length" - 1  /\ array_at h (ptr + v $! "length" + 1) stack))).
 
 Local Hint Unfold search_invariant : core.
 Local Hint Constructors search_spec search_done : core.
 Arguments List.nth: simpl nomatch.
+
+Lemma array_at_same: forall h l1 l2 ptr,
+    array_at h ptr l1 ->
+    array_at h ptr l2 ->
+    Datatypes.length l1 = Datatypes.length l2 ->
+    l1 = l2.
+Proof.
+  induct l1; simplify.
+  invert H0; simplify; equality.
+  invert H0; simplify.
+  equality.
+  invert H.
+  assert (l1 = tl).
+  apply IHl1 with (ptr := S ptr); eauto.
+  equality.
+Qed.
 
 (* HINT 5 (see Pset9Sig.v) *) 
 Theorem search_ok ptr data:
@@ -925,37 +941,38 @@ Proof.
   cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
   cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
   cases (x $! "length" - 1); cases (x $! "length"); simplify; linear_arithmetic.
-  - cases (x0 $! "length"); simplify.
+  
+  -
+    cases (x0 $! "length"); simplify.
     equality.
-  right.
-  right.
-  left.
-  propositional.
-  linear_arithmetic.
-  exists (x1 ++ [In (x0 $! "needle")]); exists []; eexists.
-  equality.
-  propositional.
-  assert (n = Datatypes.length data - 1) by linear_arithmetic.
-  rewrite H0 in H5.
-  replace (n - 0) with (S n - 1) by linear_arithmetic.
-  constructor.
-  assumption.
-  equality.
-  assert (Datatypes.length (x1 ++ [In (x0 $! "needle")]) <= 1) by linear_arithmetic.
-  Search Datatypes.length.
-  rewrite app_length in H1.
-  simplify.
-  assert (Datatypes.length x1 = 0) by linear_arithmetic.
-  Search Datatypes.length.
-  apply length_zero_iff_nil in H2.
-  subst.
-  simplify.
-  constructor.
-  assert (n = Datatypes.length data - 1) by linear_arithmetic.
-  rewrite H0.
-  simplify.
-  linear_arithmetic.
-
+    right.
+    right.
+    left.
+    propositional.
+    linear_arithmetic.
+    exists (x1 ++ [In (x0 $! "needle")]); exists []; eexists.
+    propositional.
+    assert (n = Datatypes.length data - 1) by linear_arithmetic.
+    rewrite H0 in H6.
+    replace (n - 0) with (S n - 1) by linear_arithmetic.
+    propositional.
+    constructor.
+    assumption.
+    equality.
+    assert (Datatypes.length (x1 ++ [In (x0 $! "needle")]) <= 1) by linear_arithmetic.
+    rewrite app_length in H1.
+    simplify.
+    assert (Datatypes.length x1 = 0) by linear_arithmetic.
+    apply length_zero_iff_nil in H2.
+    subst.
+    simplify.
+    constructor.
+    assert (n = Datatypes.length data - 1) by linear_arithmetic.
+    rewrite H0.
+    simplify.
+    linear_arithmetic.
+    constructor.
+  
   -
     right.
     right.
@@ -968,7 +985,17 @@ Proof.
     constructor; eauto.
     simplify.
     linear_arithmetic.
-
+    constructor.
+    rewrite <- H8.
+    rewrite Nat.add_sub_assoc.
+    assert (x0 $! "ptr" + x0 $! "length" - 1 + 1 = x0 $! "ptr" + x0 $! "length") by linear_arithmetic.
+    rewrite H0.
+    equality.
+    linear_arithmetic.
+    rewrite Nat.add_sub_assoc.
+    replace (S (x0 $! "ptr" + x0 $! "length" - 1 + 1)) with (x0 $! "ptr" + x0 $! "length" + 1) by linear_arithmetic.
+    assumption.
+    linear_arithmetic.
   -
     right.
     right.
@@ -981,7 +1008,15 @@ Proof.
     constructor; eauto.
     simplify.
     linear_arithmetic.
-    
+    constructor.
+    rewrite Nat.add_sub_assoc.
+    replace (x0 $! "ptr" + x0 $! "length" - 1 + 1) with (x0 $! "ptr" + x0 $! "length") by linear_arithmetic.
+    equality.
+    linear_arithmetic.
+    rewrite Nat.add_sub_assoc.
+    replace (S (x0 $! "ptr" + x0 $! "length" - 1 + 1)) with (x0 $! "ptr" + x0 $! "length" + 1) by linear_arithmetic.
+    assumption.
+    linear_arithmetic.
   -
     right.
     right.
@@ -1003,7 +1038,7 @@ Proof.
     constructor; eauto.
     simplify.
     linear_arithmetic.
-
+    constructor.
   -
     right.
     right.
@@ -1015,7 +1050,17 @@ Proof.
     constructor; eauto.
     simplify.
     linear_arithmetic.
-
+    constructor.
+    rewrite <- H7.
+    rewrite Nat.add_sub_assoc.
+    assert (x $! "ptr" + x $! "length" - 1 + 1 = x $! "ptr" + x $! "length") by linear_arithmetic.
+    rewrite H0.
+    equality.
+    linear_arithmetic.
+    rewrite Nat.add_sub_assoc.
+    replace (S (x $! "ptr" + x $! "length" - 1 + 1)) with (x $! "ptr" + x $! "length" + 1) by linear_arithmetic.
+    assumption.
+    linear_arithmetic.
   -
     right.
     right.
@@ -1026,11 +1071,21 @@ Proof.
     propositional.
     constructor; eauto.
     simplify.
+    linear_arithmetic.
+    constructor.
+    rewrite Nat.add_sub_assoc.
+    assert (x $! "ptr" + x $! "length" - 1 + 1 = x $! "ptr" + x $! "length") by linear_arithmetic.
+    rewrite H0.
+    equality.
+    linear_arithmetic.
+    rewrite Nat.add_sub_assoc.
+    replace (S (x $! "ptr" + x $! "length" - 1 + 1)) with (x $! "ptr" + x $! "length" + 1) by linear_arithmetic.
+    assumption.
     linear_arithmetic.
 
   -
     cases (v $! "length"); simplify.
-    rewrite app_length in H2.
+    rewrite app_length in H3.
     simplify.
     assert (Datatypes.length x = 0) by linear_arithmetic.
     apply length_zero_iff_nil in H0.
@@ -1042,7 +1097,7 @@ Proof.
   -
     invert H; simplify.
     cases (v $! "length"); simplify.
-    rewrite app_length in H2.
+    rewrite app_length in H3.
     simplify.
     assert (Datatypes.length x = 0) by linear_arithmetic.
     apply length_zero_iff_nil in H.
@@ -1055,7 +1110,39 @@ Proof.
   -
     apply SearchDone with (needle := v $! "needle") (offset := v $! "length").
     assumption.
-Admitted.
+    assert (array_at h (v $! "ptr") (v $! "needle" :: x1)).
+    constructor.
+    rewrite l in H5.
+    replace (v $! "ptr" + 0) with (v $! "ptr") in H5 by linear_arithmetic.
+    assumption.
+    rewrite l in H9.
+    replace (v $! "ptr" + 0 + 1) with (S (v $! "ptr")) in H9 by linear_arithmetic.
+    assumption.
+    assert (data = (v $! "needle" :: x1)).
+    apply array_at_same with (h := h) (ptr := (v $! "ptr")); eauto.
+    simplify.
+    linear_arithmetic.
+    subst.
+    assumption.
+    
+  -
+    apply SearchDone with (needle := v $! "needle") (offset := v $! "length").
+    assumption.
+    assert (array_at h (v $! "ptr") (h $! (v $! "ptr" + v $! "length") :: x0)).
+    constructor.
+    rewrite l.
+    replace (v $! "ptr" + 0) with (v $! "ptr") by linear_arithmetic.
+    equality.
+    rewrite l in H8.
+    replace (v $! "ptr" + 0 + 1) with (S (v $! "ptr")) in H8 by linear_arithmetic.
+    assumption.
+    assert (data = (h $! (v $! "ptr" + v $! "length") :: x0)).
+    apply array_at_same with (h := h) (ptr := (v $! "ptr")); eauto.
+    simplify.
+    linear_arithmetic.
+    subst.
+    assumption.
+Qed.
 
 (*|
 Congratulations!  If you have extra time and you'd like to explore
