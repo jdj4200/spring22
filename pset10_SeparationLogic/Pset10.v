@@ -232,21 +232,21 @@ Definition mtreep (p : nat) : hprop :=
 
    - What does A * B mean?
 
-   - If A * B holds for a heap, does A necessarily hold for this heap?
+   - If A * B holds for a heap, does A necessarily hold for this heap? Yes
 
-   - What does h === g mean?
+   - What does h === g mean? same heap sets
 
-   - What does [| P |] do? (When is it necessary?)
+   - What does [| P |] do? (When is it necessary?) Prop
 
-   - What does p |--> [x;y] mean?
+   - What does p |--> [x;y] mean? p has x, p + 1 has y
 
    - What does emp mean?
 
-   - What memory does an empty llist use?
+   - What memory does an empty llist use? none
 
-   - How can code detect that an llist is empty?
+   - How can code detect that an llist is empty? p = 0
 
-   - What memory does an llist cons cell use?
+   - What memory does an llist cons cell use? 
 
    - How can code detect that an llist starts with a cons cell?
 
@@ -295,6 +295,42 @@ Definition mtreep (p : nat) : hprop :=
 
 (* Space is provided here for additional lemmas about [mtree] and [mtree']. *)
 
+Lemma mtree'_null : forall {t p}, p = 0
+  -> mtree' t p === [| t = Leaf |].
+Proof.
+  heq; cases t; cancel.
+Qed.
+
+Theorem mtree_null : forall {p}, p = 0
+  -> mtree p === [| True |].
+Proof.
+  unfold mtree; simplify.
+  setoid_rewrite (mtree'_null H).
+  heq; cancel.
+Qed.
+
+Lemma mtree'_nonnull : forall {t p}, p <> 0
+  -> mtree' t p === exists l x r pl pr, [| t = Node l x r |] * p |--> [pl; x; pr] * mtree' l pl * mtree' r pr.
+Proof.
+  heq; cases t; cancel.
+  - equality.
+  - invert H0; cancel.
+Qed.
+
+Theorem mtree_nonnull : forall {p}, p <> 0
+  -> mtree p === exists x pl pr, p |--> [pl; x; pr] * mtree pl * mtree pr.
+Proof.
+  unfold mtree; simplify.
+  setoid_rewrite (mtree'_nonnull H).
+  heq; cancel.
+Qed.
+
+Theorem mtreep_eqn : forall {p},
+  mtreep p === exists p',  [| p <> 0 |] * p |-> p' *  mtree p'.
+Proof.
+  unfold mtreep; simp.
+  heq; cancel.
+Qed.
 
 Opaque mtree.
 (* ^-- Keep predicates opaque after you've finished proving all the key
@@ -340,7 +376,49 @@ Theorem lookup_ok : forall x p,
     lookup x p
   {{ _ ~> mtreep p }}.
 Proof.
-Admitted.
+  unfold lookup.
+  simp.
+  ht.
+  simp.
+  loop_inv (fun a : nat => mtree a * p |-> r * [| p <> 0 |])%sep
+           (fun (a : nat) (_ : bool)  => mtree a * p |-> r * [| p <> 0 |])%sep.
+  -
+    cases (acc ==n 0); simp.
+  +
+    step.
+    cancel.
+  +
+    step.
+    rewrite mtree_nonnull by assumption.
+    step.
+    simp.
+    cases (x ==n r0); simp.
+    step.
+    rewrite mtree_nonnull by assumption.
+    cancel.
+    cases (x <=? r0); simp.
+    ht.
+    apply exis_right with (x := ((acc |-> r1) * (exists n1 : nat,
+                                    (acc + 1 + 1) |-> n1 * mtree n1 * (acc + 1) |-> r0))%sep).
+    cancel.
+    apply mtree_nonnull in n as H1.
+    rewrite H1.
+    cancel.
+
+    ht.
+    apply exis_right with (x := (((acc + 1 + 1) |-> r1) *
+  (exists n1 : nat,
+      mtree n1 * acc |-> n1 * (acc + 1) |-> r0))%sep).
+    cancel.
+    apply mtree_nonnull in n as H1.
+    rewrite H1.
+    cancel.
+  -
+    cancel.
+  -
+    rewrite mtreep_eqn.
+    cancel.
+Qed.
 
 (* And here's the operation to add a new key to a tree. *)
 Definition insert (x p : nat) :=
@@ -379,7 +457,69 @@ Theorem insert_ok : forall x p,
     insert x p
   {{ _ ~> mtreep p }}.
 Proof.
-Admitted.
+  unfold insert.
+  simp.
+  loop_inv (fun a : nat => mtreep a)
+           (fun (a : nat) (_ : unit)  => mtreep a).
+  -
+    simp.
+    cases (r ==n 0); simp.
+    ht.
+    rewrite mtreep_eqn.
+    cancel.
+    apply mtree_nonnull in H.
+    rewrite H.
+    cancel.
+    rewrite mtree_null.
+    cancel.
+    equality.
+
+    ht.
+    rewrite mtree_nonnull by assumption.
+    step.
+    
+    simp.
+    cases (x <=? r0); simp.
+    step.
+    
+    apply exis_right with (x := (((r + 1) |-> r0) *
+  (exists n0 : nat,
+    (r + 1 + 1) |-> n0 * mtree n0 * acc |-> r))%sep).
+    cancel.
+    rewrite mtreep_eqn.
+    cancel.
+    rewrite mtreep_eqn.
+    cancel.
+    assert (mtreep acc === exists p',  [| acc <> 0 |] * acc |-> p' *  mtree p').
+    apply mtreep_eqn.
+    rewrite H0.
+    cancel.
+    apply mtree_nonnull in n as H1.
+    rewrite H1.
+    cancel.
+
+    step.
+    apply exis_right with (x := ((r + 1) |-> r0 *
+  (exists n1 : nat,
+      r |-> n1 * mtree n1  * acc |-> r))%sep).
+    cancel.
+    rewrite mtreep_eqn.
+    cancel.
+    linear_arithmetic.
+    rewrite mtreep_eqn.
+    cancel.
+    assert (mtreep acc === exists p',  [| acc <> 0 |] * acc |-> p' *  mtree p').
+    apply mtreep_eqn.
+    rewrite H1.
+    cancel.
+    apply mtree_nonnull in n as H2.
+    rewrite H2.
+    cancel.
+  -
+    apply himp_refl.
+  -
+    apply himp_refl.
+Qed.
 
 End Impl.
 
