@@ -100,27 +100,42 @@ Question 1) For each of the following processes, briefly describe what they do:
 
 a)  !!ch(v); k
 
+Send v on channel ch, then do k
+
 b)  ??ch(x: T); k
+
+Receive x of type T from channel ch, then do k (using x).
 
 c)  pr1 || pr2
 
+Composes processes pr1 and pr2 in parallel.
+
 d)  Dup pr
+
+Act like pr || pr || pr ..., infinitely duplicating a process to simulate loops.
 
 e)  Done
 
+Signify the end of the program
+
 f)  New[ch1; ch2; ch3](ch4); k
+
+Generates private channel ch4 that knows about channels ch1, ch2, and ch3, and plugs ch4 into process k.
 
 g)  Block ch; k
 
+Prevent k from sending or receiving messages via channel ch.
 
 Question 2) Is the "refines" relation symmetric?
 That is, if "pr1 <| pr2", does that imply "pr2 <| pr1"?
 
+No
 
 Question 3) Which of "||" and ";" binds stronger?
 In other words, does "pr1 || pr2 ; pr3" equal "pr1 || (pr2 ; pr3)" or
 "(pr1 || pr2) ; pr3"?
 
+I don't know. I would uses parentheses to specify this.
 
 Question 4) Draw a diagram of the balanced request handler and the channels it uses
 
@@ -129,6 +144,8 @@ Question 5) In order to prove refinements, we need to provide a simulation relat
 R of type "proc -> proc -> Prop", and prove the three conditions defined by "simulates".
 If we just pick "fun pr1 pr2 => True" for R, which of these three conditions can/cannot
 be proven? And what if we pick "fun pr1 pr2 => False"?
+
+
 
 
 Question 6) The specification (addN 2 input output) in MessagesAndRefinement.v performs
@@ -152,6 +169,26 @@ the following steps:
 
 Write down the same kind of explanation of steps for the implementation (add2_once input output):
 You should get steps numbered from 1) to 5).
+
+1. New[input;output](intermediate);
+  (??input(n : nat);
+  !!intermediate(n + 1);
+  Done
+ || ??intermediate(n : nat);
+  !!output(n + 1);
+  Done).
+
+2.!!intermediate(n + 1);
+  Done
+ || ??intermediate(n : nat);
+  !!output(n + 1);
+  Done)
+
+3.
+
+4.
+
+5.
 
 
 Question 7) In order to prove that the specification (addN 2 input output) can
@@ -184,7 +221,90 @@ Where do they come from, and what does each of them ask you to prove?
 
 (* HINT 1-2 (see Pset13Sig.v) *)   
 Inductive R (fs es os : fmap nat nat) (input output : channel) : proc -> proc -> Prop :=
-(* FILL IN HERE *)
+| Start :
+    NoDup [input; output] ->
+    R fs es os input output
+      (balanced_handler es os input output)
+      (request_handler fs input output)
+| ChooseForwardEven : forall forward_even,
+    NoDup [input; output; forward_even] ->
+    R fs es os input output
+      (Block forward_even;
+       New [input; output; forward_even] (forward_odd);
+       request_dispatcher input forward_even forward_odd
+       || request_handler es forward_even output
+       || request_handler os forward_odd output)
+      (request_handler fs input output)
+| ChooseForwardOdd : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       request_dispatcher input forward_even forward_odd
+       || request_handler es forward_even output
+       || request_handler os forward_odd output)
+      (request_handler fs input output)
+| Action1 : forall forward_even forward_odd req client_id key,
+    NoDup [input; output; forward_even; forward_odd] ->
+    req = GET client_id key ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       (if key mod 2 ==n 0 then
+    !!forward_even(req); Done
+  else
+    !!forward_odd(req); Done)
+       || request_handler es forward_even output
+       || request_handler os forward_odd output)
+      (match fs $? key with
+    | Some v => !! output (FOUND client_id key v); Done
+    | None => !! output (NOT_FOUND client_id key); Done
+       end)
+| ActionHandoffEven : forall forward_even forward_odd req client_id key,
+    NoDup [input; output; forward_even; forward_odd] ->
+    req = GET client_id key ->
+    key mod 2 = 0 ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       Done
+       || match es $? key with
+    | Some v => !!output(FOUND client_id key v); Done
+    | None => !!output(NOT_FOUND client_id key); Done
+    end
+       || request_handler os forward_odd output)
+      (match fs $? key with
+    | Some v => !!output(FOUND client_id key v); Done
+    | None => !!output(NOT_FOUND client_id key); Done
+    end)
+| ActionHandoffOdd : forall forward_even forward_odd req client_id key,
+    NoDup [input; output; forward_even; forward_odd] ->
+    req = GET client_id key ->
+    key mod 2 <> 0 ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       Done
+      || request_handler es forward_even output
+       || match os $? key with
+    | Some v => !!output(FOUND client_id key v); Done
+    | None => !!output(NOT_FOUND client_id key); Done
+    end)
+      (match fs $? key with
+    | Some v => !!output(FOUND client_id key v); Done
+    | None => !!output(NOT_FOUND client_id key); Done
+       end)
+| FinishEven2 : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       Done || Done
+       || request_handler os forward_odd output)
+      Done
+| FinishOdd2 : forall forward_even forward_odd,
+    NoDup [input; output; forward_even; forward_odd] ->
+    R fs es os input output
+      (Block forward_even; Block forward_odd;
+       Done
+       || request_handler es forward_even output
+       || Done)
+      Done
 .
 
 Definition R_alias_for_grading := R.
@@ -222,10 +342,132 @@ Ltac t_step :=
 
 Ltac t := repeat t_step.
 
+Lemma balanced_handler_refines_request_handler :
+  forall full_store even_store odd_store input output,
+  split_store full_store even_store odd_store ->
+  input <> output ->
+  (balanced_handler even_store odd_store input output) <| (request_handler full_store input output).
+Proof.
+  simplify.
+  exists (R full_store even_store odd_store input output).
+  first_order.
+  -
+    invert H4.
+    invert H5.
+    eexists; split.
+    eauto.
+    eapply ChooseForwardEven.
+    lists.
+    
+    invert H5.
+    invert H8.
+    eexists; split.
+    eauto.
+    eapply ChooseForwardOdd.
+    lists.
+
+    t.
+    
+    t.
+    cases (key mod 2); simplify; invert H9.
+    cases (key mod 2); simplify; invert H7.
+    eexists.
+    split.
+    eauto.
+    replace key0 with key by equality.
+    replace client_id0 with client_id by equality.
+    eapply ActionHandoffEven; eauto.
+    lists.
+    cases (key mod 2); simplify; invert H10.
+    lists.
+    eexists; split.
+    eauto.
+    replace key0 with key by equality.
+    replace client_id0 with client_id by equality.
+    eapply ActionHandoffOdd; eauto.
+    linear_arithmetic.
+
+    t.
+    cases (even_store $? key); invert H10.
+    cases (even_store $? key); invert H11; lists.
+    
+    t.
+    cases (odd_store $? key); invert H11.
+    cases (odd_store $? key); invert H10; lists.
+    
+    t.
+    t.
+  -
+    invert H4.
+    invert H5.
+    
+    invert H5.
+    invert H8.
+
+    t.
+    eexists; eexists; split.
+    eauto.
+    split.
+    econstructor.
+    eapply Action1; eauto.
+
+    t.
+    cases (key mod 2); invert H9; lists.
+
+    t.
+    apply H in H8.
+    cases (even_store $? key); invert H10; simplify.
+    cases (full_store $? key); simplify.
+    replace n0 with n by equality.
+    eexists; eexists; split.
+    eauto.
+    split.
+    econstructor.
+    eapply FinishEven2; eauto.
+    equality.
+    cases (full_store $? key); simplify.
+    equality.
+    eexists; eexists; split.
+    eauto.
+    split.
+    econstructor.
+    eapply FinishEven2; eauto.
+
+    t.
+    apply H3 in H8.
+    cases (odd_store $? key); invert H11; simplify.
+    cases (full_store $? key); simplify.
+    replace n0 with n by equality.
+    eexists; eexists; split.
+    eauto.
+    split.
+    econstructor.
+    eapply FinishOdd2; eauto.
+    equality.
+    cases (full_store $? key); simplify.
+    equality.
+    eexists; eexists; split.
+    eauto.
+    split.
+    econstructor.
+    eapply FinishOdd2; eauto.
+
+    t.
+    t.
+  -
+    constructor.
+    lists.
+Qed.    
+    
 (* HINT 3-5 (see Pset13Sig.v) *)   
 Theorem balanced_handler_correct : correctness.
 Proof.
-Admitted.
+  unfold correctness.
+  simplify.
+  eapply refines_couldGenerate.
+  apply balanced_handler_refines_request_handler; eauto.
+  eauto.  
+Qed.
 
 (* OPTIONAL exercise (ungraded, very short):
    Another important property of refinment is that any subpart of a larger
@@ -242,7 +484,12 @@ Lemma multicorrectness : forall full_store even_store odd_store input output,
     couldGenerate (Dup (balanced_handler even_store odd_store input output)) trace ->
     couldGenerate (Dup (request_handler full_store input output)) trace.
 Proof.
-Admitted.
+  simplify.
+  eapply refines_couldGenerate.
+  apply refines_Dup.
+  apply balanced_handler_refines_request_handler; eauto.
+  eauto.
+Qed.
 
 End Impl.
 
